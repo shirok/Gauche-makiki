@@ -1,0 +1,22 @@
+#!/usr/bin/env gosh
+
+(add-load-path ".")
+(use makiki)
+(use text.html-lite)
+
+(define-http-handler #/^\/$/
+  (lambda (req match)
+    (respond/ok req
+                (html:html
+                 (html:head (html:title "Makiki"))
+                 (html:body (html:h1 "You're running Makiki http server"))))))
+
+(define-http-handler #/./ (file-handler))
+
+(define (main args)
+  (start-http-server)
+  0)
+
+;; Local variables:
+;; mode: scheme
+;; end:
