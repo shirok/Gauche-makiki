@@ -293,12 +293,13 @@
           [(done) (let1 r (job-result j)
                     (unless (request? r)
                       (error "some handler didn't return request:" r))
-                    (log "~a: ~a \"~a\" ~a ~a ~a"
+                    (log "~a: ~a \"~a\" ~a ~a ~s ~a"
                          (logtime (job-acknowledge-time j))
                          (logip (request-remote-addr r))
                          (request-line r)
                          (request-status r)
                          (request-reply-size r)
+                         (logreferer r)
                          (logdt (job-acknowledge-time j) (job-finish-time j))))]
           [(error) (log "[internal] job error: ~a" (~ (job-result j)'message))]
           [(killed) (log "[internal] job killed: ~a" (job-result j))]
@@ -321,6 +322,9 @@
             (+ (* (time-second dt) 1000)
                (quotient (time-nanosecond dt) 1000000))
             (modulo (quotient (time-nanosecond dt) 1000) 1000))))
+
+(define (logreferer req)
+  (rfc822-header-ref (request-headers req) "referer" "-"))
   
 ;;;
 ;;; Built-in handlers
