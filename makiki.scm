@@ -39,6 +39,7 @@
   (use control.thread-pool :prefix tpool:)
   (use srfi-1)
   (use srfi-13)
+  (use srfi-19)
   (use text.tree)
   (use file.util)
   (use rfc.822)
@@ -70,18 +71,28 @@
 (define httpd-log-drain (make-parameter #f))
 
 (define-macro (log fmt . args)
-  `(log-format (httpd-log-drain) ,fmt ,@args))
+  (let1 drain (gensym)
+    `(if-let1 ,drain (httpd-log-drain)
+       (log-format ,drain ,fmt ,@args))))
 
 ;;;
 ;;; Request packet
 ;;;
 
-(define-record-type request #t #t
-  socket                                ; client socket
-  method                                ; request method
-  path                                  ; request path
-  params                                ; query parameters
-  headers)                              ; request headers
+(define-record-type request  %make-request #t
+  line                               ; the first line of the request
+  socket                             ; client socket
+  remote-addr                        ; remote address (sockaddr)
+  method                             ; request method
+  path                               ; request path
+  params                             ; query parameters
+  headers                            ; request headers
+  (status)                           ; result status (set later)
+  (reply-size))                      ; size of reply content in octets
+
+(define-inline (make-request line socket method path params headers)
+  (%make-request line socket (socket-getpeername socket)
+                 method path params headers #f 0))
 
 (define-inline (request-iport req) (socket-input-port (request-socket req)))
 (define-inline (request-oport req) (socket-output-port (request-socket req)))
@@ -147,15 +158,16 @@
       (p content)
       (flush port))))
 
-(define (respond/ng req/oport code :optional (keepalive #f))
-  (let ([port (if (request? req/oport)
-                (request-oport req/oport)
-                req/oport)]
-        [desc (hash-table-get *status-code-map* code "")])
-    (begin0 (%respond code "text/plain; charset=utf-8" desc port)
-      (when (and (request? req/oport) (not keepalive))
-        (socket-close (request-socket req/oport))))))
+;; returns Request
+(define (respond/ng req code :optional (keepalive #f))
+  (%respond code "text/plain; charset=utf-8"
+            (hash-table-get *status-code-map* code "")
+            (request-oport req))
+  (request-status-set! req code)
+  (unless keepalive (socket-close (request-socket req)))
+  req)
 
+;; returns Request
 (define (respond/ok req body :optional (keepalive #f))
   (unwind-protect
       (guard (e [else (log "respond/ok error ~s" (~ e'message))
@@ -177,7 +189,9 @@
             [('json alist) (%respond "200" "application/json; charset=uft-8"
                                      (alist->json alist) oport)]
             [else (%respond "200" "text/html; charset=utf-8"
-                            (tree->string body) oport)])))
+                            (tree->string body) oport)]))
+        (request-status-set! req "200")
+        req)
     (unless keepalive (socket-close (request-socket req)))))
 
 (define (alist->json alist)
@@ -215,11 +229,12 @@
                                 (document-root ".")
                                 (num-threads 5)
                                 (max-backlog 10)
-                                (log-drain #f))
-  (parameterize ([httpd-log-drain (if (is-a? log-drain <log-drain>)
-                                    log-drain
-                                    (make <log-drain>
-                                      :path log-drain :program-name "makiki"))])
+                                (log-to #f))
+  (parameterize ([httpd-log-drain
+                  (cond [(not log-to) #f]
+                        [(is-a? log-to <log-drain>) log-to]
+                        [else (make <log-drain>
+                                :path log-to :program-name "makiki")])])
     (let* ([pool (tpool:make-thread-pool num-threads :max-backlog 10)]
            [tlog (kick-logger-thread pool)]
            [ssocks (make-server-sockets host port :reuse-addr? #t)])
@@ -237,38 +252,60 @@
         (thread-terminate! tlog)))))
 
 (define (kick-logger-thread pool)
-  (thread-start!
-   (make-thread
-    (lambda ()
-      (let loop ()
-        (let1 r (dequeue/wait! (~ pool'result-queue))
-          (log-format "~a ~s" (job-status r) (job-result r))
-          (loop)))))))
+  (thread-start! (make-thread (cut logger pool))))
 
+(define (logger pool)
+  (guard (e [else (log "[internal] logger error: ~a" (~ e'message))])
+    (let loop ()
+      (let1 j (dequeue/wait! (~ pool'result-queue))
+        (case (job-status j)
+          [(done) (let1 r (job-result j)
+                    (unless (request? r)
+                      (error "some handler didn't return request:" r))
+                    (log "~a \"~a\" ~a ~a ~aus"
+                         (inet-address->string
+                          (sockaddr-addr (request-remote-addr r))
+                          (case (sockaddr-family (request-remote-addr r))
+                            [(inet)  AF_INET]
+                            [(inet6) AF_INET6]
+                            [else AF_INET])) ;just in case
+                         (request-line r)
+                         (request-status r)
+                         (request-reply-size r)
+                         (let1 dt (time-difference (job-finish-time j)
+                                                   (job-acknowledge-time j))
+                           (+ (* (time-second dt) 1000)
+                              (quotient (time-nanosecond dt) 1000)))))]
+          [(error) (log "[internal] job error: ~a" (~ (job-result j)'message))]
+          [(killed) (log "[internal] job killed: ~a" (job-result j))]
+          [else (log "[internal] unexpected job status: ~a" (job-status j))]))
+      (loop))
+    (logger pool)))
+
+(define (logftime time)
+  (date->string (time-utc->date time) "~4"))
+  
 (define (accept-client csock pool)
-  (unless (tpool:add-job! pool (cut handle-client csock))
-    (respond/ng (socket-output-port csock) "503")
+  (unless (tpool:add-job! pool (cut handle-client csock) #t)
+    (respond/ng (make-request "" csock "" "" '() '()) "503")
     (socket-close csock)))
 
 (define (handle-client csock)
-  (let1 oport (socket-output-port csock)
-    (guard (e [else (respond/ng oport "500")])
-      (match (get-request (socket-input-port csock))
-        ['bad-request (respond/ng oport "400")]
-        ['not-implemented (respond/ng oport "501")]
-        [(meth path params . headers)
-         (dispatch-handler (make-request csock meth path params headers))]
-        [other (respond/ng oport "500")]))))
-
-(define (get-request iport)
-  (rxmatch-case (read-line iport)
-    [test eof-object? 'bad-request]
-    [#/^(GET|HEAD)\s+(\S+)\s+HTTP\/\d+\.\d+$/ (_ meth abs-path)
-     (receive (auth path q frag) (uri-decompose-hierarchical abs-path)
-       (let1 params (cgi-parse-parameters :query-string (or q ""))
-         (list* meth path params (rfc822-read-headers iport))))]
-    [#/^[A-Z]+/ () 'not-implemented]
-    [else 'bad-request]))
+  (guard (e [else (respond/ng (make-request "" csock "" "" '() '()) "500")])
+    (let* ([iport (socket-input-port csock)]
+           [line (read-line (socket-input-port csock))])
+      (rxmatch-case line
+        [test eof-object?
+              (respond/ng (make-request line csock "" "" '() '()) "400")]
+        [#/^(GET|HEAD)\s+(\S+)\s+HTTP\/\d+\.\d+$/ (_ meth abs-path)
+         (receive (auth path q frag) (uri-decompose-hierarchical abs-path)
+           (let1 params (cgi-parse-parameters :query-string (or q ""))
+             (dispatch-handler (make-request line csock meth path params
+                                             (rfc822-read-headers iport)))))]
+        [#/^[A-Z]+.*/
+         (respond/ng (make-request line csock "" "" '() '()) "501")]
+        [other
+         (respond/ng (make-request line csock "" "" '() '()) "400")]))))
 
 ;;;
 ;;; Built-in handlers

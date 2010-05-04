@@ -14,7 +14,7 @@
 (define-http-handler #/./ (file-handler))
 
 (define (main args)
-  (start-http-server)
+  (start-http-server :log-to #t)
   0)
 
 ;; Local variables:
