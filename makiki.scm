@@ -217,9 +217,10 @@
   (syntax-rules ()
     [(_ path-rx handler) (enqueue! *handlers* (cons path-rx handler))]))
 
-(define (dispatch-handler req)
+(define (dispatch-handler req app)
   (let1 path (request-path req)
-    (or (any-in-queue (^p(cond [((car p) path) => (cut(cdr p)req <>)][else #f]))
+    (or (any-in-queue (^p (cond [((car p) path) => (cut (cdr p) req <> app)]
+                                [else #f]))
                       *handlers*)
         (respond/ng req 404))))
 
@@ -232,7 +233,8 @@
                                 (document-root ".")
                                 (num-threads 5)
                                 (max-backlog 10)
-                                (log-to #f))
+                                (log-to #f)
+                                (app-data #f))
   (parameterize ([httpd-log-drain
                   (cond [(not log-to) #f]
                         [(is-a? log-to <log-drain>) log-to]
@@ -246,7 +248,7 @@
             (dolist [s ssocks]
               (selector-add! sel (socket-fd s)
                              (lambda (fd condition)
-                               (accept-client (socket-accept s) pool))
+                               (accept-client app-data (socket-accept s) pool))
                              '(r)))
             (while #t (selector-select sel)))
         (log "terminating")
@@ -257,12 +259,12 @@
 (define (kick-logger-thread pool)
   (thread-start! (make-thread (cut logger pool))))
 
-(define (accept-client csock pool)
-  (unless (tpool:add-job! pool (cut handle-client csock) #t)
+(define (accept-client app csock pool)
+  (unless (tpool:add-job! pool (cut handle-client app csock) #t)
     (respond/ng (make-partial-request "too many request backlog" csock) 503)
     (socket-close csock)))
 
-(define (handle-client csock)
+(define (handle-client app csock)
   (guard (e [else (respond/ng (make-partial-request (~ e'message) csock) 500)])
     (let* ([iport (socket-input-port csock)]
            [line (read-line (socket-input-port csock))])
@@ -274,7 +276,8 @@
            (let ([params (cgi-parse-parameters :query-string (or q ""))]
                  [path (uri-decode-string path :cgi-decode #t)])
              (dispatch-handler (make-request line csock meth path params
-                                             (rfc822-read-headers iport)))))]
+                                             (rfc822-read-headers iport))
+                               app)))]
         [#/^[A-Z]+.*/ (respond/ng (make-request line csock "" "" '() '()) 501)]
         [else (respond/ng (make-request line csock "" "" '() '()) 400)]))))
 
@@ -324,7 +327,7 @@
 ;;;
 
 (define (file-handler :key (directory-index '("index.html" #t)))
-  (lambda (req m) (%handle-file req m directory-index)))
+  (lambda (req m app) (%handle-file req m directory-index)))
 
 (define (%handle-file req m dirindex)
   (let1 rpath (sys-normalize-pathname (request-path req) :canonicalize #t)

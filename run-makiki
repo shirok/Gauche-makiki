@@ -5,16 +5,17 @@
 (use text.html-lite)
 
 (define-http-handler #/^\/$/
-  (lambda (req match)
+  (lambda (req match app)
     (respond/ok req
                 (html:html
                  (html:head (html:title "Makiki"))
-                 (html:body (html:h1 "You're running Makiki http server"))))))
+                 (html:body (html:h1 "You're running Makiki http server")
+                            (html:p "The server is running since " app))))))
 
 (define-http-handler #/./ (file-handler))
 
 (define (main args)
-  (start-http-server :log-to #t)
+  (start-http-server :log-to #t :app-data (sys-ctime (sys-time)))
   0)
 
 ;; Local variables:
