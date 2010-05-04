@@ -44,6 +44,7 @@
   (use file.util)
   (use rfc.822)
   (use rfc.uri)
+  (use text.html-lite)
   (use util.list)
   (use util.queue)
   (use util.match)
@@ -93,6 +94,9 @@
 (define-inline (make-request line socket method path params headers)
   (%make-request line socket (socket-getpeername socket)
                  method path params headers #f 0))
+(define-inline (make-partial-request msg socket)
+  (%make-request #`"#<error - ,|msg|>" socket (socket-getpeername socket)
+                 "" "" '() '() #f 0))
 
 (define-inline (request-iport req) (socket-input-port (request-socket req)))
 (define-inline (request-oport req) (socket-output-port (request-socket req)))
@@ -233,8 +237,7 @@
   (parameterize ([httpd-log-drain
                   (cond [(not log-to) #f]
                         [(is-a? log-to <log-drain>) log-to]
-                        [else (make <log-drain>
-                                :path log-to :program-name "makiki")])])
+                        [else (make <log-drain> :path log-to :prefix "")])])
     (let* ([pool (tpool:make-thread-pool num-threads :max-backlog 10)]
            [tlog (kick-logger-thread pool)]
            [ssocks (make-server-sockets host port :reuse-addr? #t)])
@@ -254,6 +257,33 @@
 (define (kick-logger-thread pool)
   (thread-start! (make-thread (cut logger pool))))
 
+(define (accept-client csock pool)
+  (unless (tpool:add-job! pool (cut handle-client csock) #t)
+    (respond/ng (make-partial-request "too many request backlog" csock) "503")
+    (socket-close csock)))
+
+(define (handle-client csock)
+  (guard (e [else (respond/ng (make-partial-request (~ e'message) csock) "500")])
+    (let* ([iport (socket-input-port csock)]
+           [line (read-line (socket-input-port csock))])
+      (rxmatch-case line
+        [test eof-object?
+         (respond/ng (make-partial-request "client gone" csock) "400")]
+        [#/^(GET|HEAD)\s+(\S+)\s+HTTP\/\d+\.\d+$/ (_ meth abs-path)
+         (receive (auth path q frag) (uri-decompose-hierarchical abs-path)
+           (let ([params (cgi-parse-parameters :query-string (or q ""))]
+                 [path (uri-decode-string path :cgi-decode #t)])
+             (dispatch-handler (make-request line csock meth path params
+                                             (rfc822-read-headers iport)))))]
+        [#/^[A-Z]+.*/
+         (respond/ng (make-request line csock "" "" '() '()) "501")]
+        [else
+         (respond/ng (make-request line csock "" "" '() '()) "400")]))))
+
+;;;
+;;; Logging
+;;;
+
 (define (logger pool)
   (guard (e [else (log "[internal] logger error: ~a" (~ e'message))])
     (let loop ()
@@ -262,51 +292,35 @@
           [(done) (let1 r (job-result j)
                     (unless (request? r)
                       (error "some handler didn't return request:" r))
-                    (log "~a \"~a\" ~a ~a ~aus"
-                         (inet-address->string
-                          (sockaddr-addr (request-remote-addr r))
-                          (case (sockaddr-family (request-remote-addr r))
-                            [(inet)  AF_INET]
-                            [(inet6) AF_INET6]
-                            [else AF_INET])) ;just in case
+                    (log "~a: ~a \"~a\" ~a ~a ~a"
+                         (logtime (job-acknowledge-time j))
+                         (logip (request-remote-addr r))
                          (request-line r)
                          (request-status r)
                          (request-reply-size r)
-                         (let1 dt (time-difference (job-finish-time j)
-                                                   (job-acknowledge-time j))
-                           (+ (* (time-second dt) 1000)
-                              (quotient (time-nanosecond dt) 1000)))))]
+                         (logdt (job-acknowledge-time j) (job-finish-time j))))]
           [(error) (log "[internal] job error: ~a" (~ (job-result j)'message))]
           [(killed) (log "[internal] job killed: ~a" (job-result j))]
           [else (log "[internal] unexpected job status: ~a" (job-status j))]))
       (loop))
     (logger pool)))
 
-(define (logftime time)
-  (date->string (time-utc->date time) "~4"))
+(define (logtime time) (date->string (time-utc->date time) "~4"))
+
+(define (logip addr)
+  (inet-address->string (sockaddr-addr addr)
+                        (case (sockaddr-family addr)
+                          [(inet)  AF_INET]
+                          [(inet6) AF_INET6]
+                          [else AF_INET]))) ;just in case
+
+(define (logdt t0 t1)
+  (let1 dt (time-difference t1 t0)
+    (format "~:d.~3,'0dms"
+            (+ (* (time-second dt) 1000)
+               (quotient (time-nanosecond dt) 1000000))
+            (modulo (quotient (time-nanosecond dt) 1000) 1000))))
   
-(define (accept-client csock pool)
-  (unless (tpool:add-job! pool (cut handle-client csock) #t)
-    (respond/ng (make-request "" csock "" "" '() '()) "503")
-    (socket-close csock)))
-
-(define (handle-client csock)
-  (guard (e [else (respond/ng (make-request "" csock "" "" '() '()) "500")])
-    (let* ([iport (socket-input-port csock)]
-           [line (read-line (socket-input-port csock))])
-      (rxmatch-case line
-        [test eof-object?
-              (respond/ng (make-request line csock "" "" '() '()) "400")]
-        [#/^(GET|HEAD)\s+(\S+)\s+HTTP\/\d+\.\d+$/ (_ meth abs-path)
-         (receive (auth path q frag) (uri-decompose-hierarchical abs-path)
-           (let1 params (cgi-parse-parameters :query-string (or q ""))
-             (dispatch-handler (make-request line csock meth path params
-                                             (rfc822-read-headers iport)))))]
-        [#/^[A-Z]+.*/
-         (respond/ng (make-request line csock "" "" '() '()) "501")]
-        [other
-         (respond/ng (make-request line csock "" "" '() '()) "400")]))))
-
 ;;;
 ;;; Built-in handlers
 ;;;
@@ -315,24 +329,40 @@
   (lambda (req m) (%handle-file req m directory-index)))
 
 (define (%handle-file req m dirindex)
-  (let1 cpath (sys-normalize-pathname (request-path req) :canonicalize #t)
-    (if (or (string-prefix? "/../" cpath)
-            (string=? "/.." cpath))
+  (let1 rpath (sys-normalize-pathname (request-path req) :canonicalize #t)
+    (if (or (string-prefix? "/../" rpath)
+            (string=? "/.." rpath))
       (respond/ng req "403")      ;do not allow path traversal
-      (let1 fpath (sys-normalize-pathname #`",(docroot),cpath")
+      (let1 fpath (sys-normalize-pathname #`",(docroot),rpath")
         (cond [(file-is-readable? fpath)
                (if (file-is-directory? fpath)
-                 (%handle-directory path dirindex)
+                 (%handle-directory req fpath rpath dirindex)
                  (respond/ok req `(file ,fpath)))]
               [(file-exists? fpath) (respond/ng req "403")]
               [else (respond/ng req "404")])))))
 
-(define (%handle-directory path dirindex)
+(define (%handle-directory req fpath rpath dirindex)
   (let loop ([ind dirindex])
     (match ind
       [() (respond/ng req "403")]
-      [(#t . _) (%index-directory path)]
+      [(#t . _) (respond/ok req (%index-directory fpath rpath))]
       [(name . rest) (let1 f (build-path fpath name)
                        (if (file-is-readable? f)
                          (respond/ok req `(file ,f))
                          (loop rest)))])))
+
+(define (%index-directory fpath rpath)
+  (receive (dirs files) (directory-list2 fpath)
+    (html:html
+     (html:head (html:title rpath))
+     (html:body
+      (html:h1 rpath)
+      (html:hr)
+      (html:ul
+       (map (cut %render-file-entry <> rpath "/") dirs)
+       (map (cut %render-file-entry <> rpath "") files))))))
+
+(define (%render-file-entry name rpath suffix)
+  (html:li
+   (html:a :href (build-path rpath name)
+           (html-escape-string (string-append name suffix)))))

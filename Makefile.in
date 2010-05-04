@@ -40,7 +40,7 @@ GAUCHE_PKGARCHDIR = $(DESTDIR)@GAUCHE_PKGARCHDIR@
 
 makiki_SRCS =
 
-all : $(TARGET)
+all : $(TARGET) makiki.scm
 
 check : all
 	@rm -f test.log
