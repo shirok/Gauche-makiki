@@ -150,10 +150,13 @@
               '(505 . "HTTP Version Not Supported")
               ))
 
-(define (%respond code content-type content port)
-  (define (p x) (display x port))
-  (define (crlf) (display "\r\n" port))
-  (let1 desc (hash-table-get *status-code-map* code "")
+(define (%respond req code content-type content)
+  (request-status-set! req code)
+  (request-reply-size-set! req (string-size content))
+  (let ([port (request-oport req)]
+        [desc (hash-table-get *status-code-map* code "")])
+    (define (p x) (display x port))
+    (define (crlf) (display "\r\n" port))
     (guard (e [(<system-error> e) (log "response error ~s" e)])
       (p "HTTP/1.1 ") (p code) (p " ") (p desc) (crlf)
       (p "Content-Type: ") (p content-type) (crlf)
@@ -164,10 +167,8 @@
 
 ;; returns Request
 (define (respond/ng req code :optional (keepalive #f))
-  (%respond code "text/plain; charset=utf-8"
-            (hash-table-get *status-code-map* code "")
-            (request-oport req))
-  (request-status-set! req code)
+  (%respond req code "text/plain; charset=utf-8"
+            (hash-table-get *status-code-map* code ""))
   (unless keepalive (socket-close (request-socket req)))
   req)
 
@@ -176,25 +177,23 @@
   (unwind-protect
       (guard (e [else (log "respond/ok error ~s" (~ e'message))
                       (respond/ng req 500)])
-        (let1 oport (request-oport req)
-          (match body
-            [(? string?)
-             (%respond 200 "text/html; charset=utf-8" body oport)]
-            [('file filename)
-             (let1 ctype (rxmatch-case filename
-                           [#/\.js$/ () "application/javascript; charset=uft-8"]
-                           [#/\.png$/ () "image/png"]
-                           [#/\.jpg$/ () "image/jpeg"]
-                           [#/\.css$/ () "text/css"]
-                           [#/\.html$/ () "text/html; charset=uft-8"])
-               (%respond 200 ctype (file->string filename) oport))]
-            [('plain obj) (%respond 200 "text/plain; charset=utf-8"
-                                    (write-to-string obj display) oport)]
-            [('json alist) (%respond 200 "application/json; charset=uft-8"
-                                     (alist->json alist) oport)]
-            [else (%respond 200 "text/html; charset=utf-8"
-                            (tree->string body) oport)]))
-        (request-status-set! req 200)
+        (match body
+          [(? string?) (%respond req 200 "text/html; charset=utf-8" body)]
+          [('file filename)
+           (let1 ctype (rxmatch-case filename
+                         [#/\.js$/ () "application/javascript; charset=uft-8"]
+                         [#/\.png$/ () "image/png"]
+                         [#/\.jpg$/ () "image/jpeg"]
+                         [#/\.css$/ () "text/css"]
+                         [#/\.html$/ () "text/html; charset=uft-8"]
+                         [else "text/plain"]) ;ideally use file magic
+             (%respond req 200 ctype (file->string filename)))]
+          [('plain obj) (%respond req 200 "text/plain; charset=utf-8"
+                                  (write-to-string obj display))]
+          [('json alist) (%respond req 200 "application/json; charset=uft-8"
+                                   (alist->json alist))]
+          [else (%respond req 200 "text/html; charset=utf-8"
+                          (tree->string body))])
         req)
     (unless keepalive (socket-close (request-socket req)))))
 
