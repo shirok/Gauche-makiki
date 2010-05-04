@@ -81,15 +81,15 @@
 ;;;
 
 (define-record-type request  %make-request #t
-  line                               ; the first line of the request
-  socket                             ; client socket
-  remote-addr                        ; remote address (sockaddr)
-  method                             ; request method
-  path                               ; request path
-  params                             ; query parameters
-  headers                            ; request headers
-  (status)                           ; result status (set later)
-  (reply-size))                      ; size of reply content in octets
+  line                ; the first line of the request
+  socket              ; client socket
+  remote-addr         ; remote address (sockaddr)
+  method              ; request method
+  path                ; request path
+  params              ; query parameters
+  headers             ; request headers
+  (status)            ; result status (set later)
+  (reply-size))       ; size of reply content in octets (set later)
 
 (define-inline (make-request line socket method path params headers)
   (%make-request line socket (socket-getpeername socket)
@@ -275,10 +275,8 @@
                  [path (uri-decode-string path :cgi-decode #t)])
              (dispatch-handler (make-request line csock meth path params
                                              (rfc822-read-headers iport)))))]
-        [#/^[A-Z]+.*/
-         (respond/ng (make-request line csock "" "" '() '()) 501)]
-        [else
-         (respond/ng (make-request line csock "" "" '() '()) 400)]))))
+        [#/^[A-Z]+.*/ (respond/ng (make-request line csock "" "" '() '()) 501)]
+        [else (respond/ng (make-request line csock "" "" '() '()) 400)]))))
 
 ;;;
 ;;; Logging
