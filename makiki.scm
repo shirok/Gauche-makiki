@@ -237,8 +237,9 @@
   (parameterize ([httpd-log-drain
                   (cond [(not log-to) #f]
                         [(is-a? log-to <log-drain>) log-to]
-                        [else (make <log-drain> :path log-to :prefix "")])])
-    (let* ([pool (tpool:make-thread-pool num-threads :max-backlog 10)]
+                        [else (make <log-drain> :path log-to :prefix "")])]
+                 [docroot document-root])
+    (let* ([pool (tpool:make-thread-pool num-threads :max-backlog max-backlog)]
            [tlog (kick-logger-thread pool)]
            [ssocks (make-server-sockets host port :reuse-addr? #t)])
       (unwind-protect
