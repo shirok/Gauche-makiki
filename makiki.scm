@@ -106,48 +106,48 @@
 ;;;
 
 (define *status-code-map*
-  (hash-table 'string=?
-              '("100" . "Continue")
-              '("101" . "Switching Protocols")
-              '("200" . "OK")
-              '("201" . "Created")
-              '("202" . "Accepted")
-              '("203" . "Non-Authoritative Information")
-              '("204" . "No Content")
-              '("205" . "Reset Content")
-              '("206" . "Partial Content")
-              '("300" . "Multiple Choices")
-              '("301" . "Moved Permanently")
-              '("302" . "Found")
-              '("303" . "See Other")
-              '("304" . "Not Modified")
-              '("305" . "Use Proxy")
-              '("306" . "(Unused)")
-              '("307" . "Temporary Redirect")
-              '("400" . "Bad Request")
-              '("401" . "Unauthorized")
-              '("402" . "Payment Required")
-              '("403" . "Forbidden")
-              '("404" . "Not Found")
-              '("405" . "Method Not Allowed")
-              '("406" . "Not Acceptable")
-              '("407" . "Proxy Authentication Required")
-              '("408" . "Request Timeout")
-              '("409" . "Conflict")
-              '("410" . "Gone")
-              '("411" . "Length Required")
-              '("412" . "Precondition Failed")
-              '("413" . "Request Entity Too Large")
-              '("414" . "Request-URI Too Long")
-              '("415" . "Unsupported Media Type")
-              '("416" . "Requested Range Not Satisfiable")
-              '("417" . "Expectation Failed")
-              '("500" . "Internal Server Error")
-              '("501" . "Not Implemented")
-              '("502" . "Bad Gateway")
-              '("503" . "Service Unavailable")
-              '("504" . "Gateway Timeout")
-              '("505" . "HTTP Version Not Supported")
+  (hash-table 'eqv?
+              '(100 . "Continue")
+              '(101 . "Switching Protocols")
+              '(200 . "OK")
+              '(201 . "Created")
+              '(202 . "Accepted")
+              '(203 . "Non-Authoritative Information")
+              '(204 . "No Content")
+              '(205 . "Reset Content")
+              '(206 . "Partial Content")
+              '(300 . "Multiple Choices")
+              '(301 . "Moved Permanently")
+              '(302 . "Found")
+              '(303 . "See Other")
+              '(304 . "Not Modified")
+              '(305 . "Use Proxy")
+              '(306 . "(Unused)")
+              '(307 . "Temporary Redirect")
+              '(400 . "Bad Request")
+              '(401 . "Unauthorized")
+              '(402 . "Payment Required")
+              '(403 . "Forbidden")
+              '(404 . "Not Found")
+              '(405 . "Method Not Allowed")
+              '(406 . "Not Acceptable")
+              '(407 . "Proxy Authentication Required")
+              '(408 . "Request Timeout")
+              '(409 . "Conflict")
+              '(410 . "Gone")
+              '(411 . "Length Required")
+              '(412 . "Precondition Failed")
+              '(413 . "Request Entity Too Large")
+              '(414 . "Request-URI Too Long")
+              '(415 . "Unsupported Media Type")
+              '(416 . "Requested Range Not Satisfiable")
+              '(417 . "Expectation Failed")
+              '(500 . "Internal Server Error")
+              '(501 . "Not Implemented")
+              '(502 . "Bad Gateway")
+              '(503 . "Service Unavailable")
+              '(504 . "Gateway Timeout")
+              '(505 . "HTTP Version Not Supported")
               ))
 
 (define (%respond code content-type content port)
@@ -175,11 +175,11 @@
 (define (respond/ok req body :optional (keepalive #f))
   (unwind-protect
       (guard (e [else (log "respond/ok error ~s" (~ e'message))
-                      (respond/ng req "500")])
+                      (respond/ng req 500)])
         (let1 oport (request-oport req)
           (match body
             [(? string?)
-             (%respond "200" "text/html; charset=utf-8" body oport)]
+             (%respond 200 "text/html; charset=utf-8" body oport)]
             [('file filename)
              (let1 ctype (rxmatch-case filename
                            [#/\.js$/ () "application/javascript; charset=uft-8"]
@@ -187,14 +187,14 @@
                            [#/\.jpg$/ () "image/jpeg"]
                            [#/\.css$/ () "text/css"]
                            [#/\.html$/ () "text/html; charset=uft-8"])
-               (%respond "200" ctype (file->string filename) oport))]
-            [('plain obj) (%respond "200" "text/plain; charset=utf-8"
+               (%respond 200 ctype (file->string filename) oport))]
+            [('plain obj) (%respond 200 "text/plain; charset=utf-8"
                                     (write-to-string obj display) oport)]
-            [('json alist) (%respond "200" "application/json; charset=uft-8"
+            [('json alist) (%respond 200 "application/json; charset=uft-8"
                                      (alist->json alist) oport)]
-            [else (%respond "200" "text/html; charset=utf-8"
+            [else (%respond 200 "text/html; charset=utf-8"
                             (tree->string body) oport)]))
-        (request-status-set! req "200")
+        (request-status-set! req 200)
         req)
     (unless keepalive (socket-close (request-socket req)))))
 
@@ -222,7 +222,7 @@
   (let1 path (request-path req)
     (or (any-in-queue (^p(cond [((car p) path) => (cut(cdr p)req <>)][else #f]))
                       *handlers*)
-        (respond/ng req "404"))))
+        (respond/ng req 404))))
 
 ;;;
 ;;; Main loop
@@ -259,16 +259,16 @@
 
 (define (accept-client csock pool)
   (unless (tpool:add-job! pool (cut handle-client csock) #t)
-    (respond/ng (make-partial-request "too many request backlog" csock) "503")
+    (respond/ng (make-partial-request "too many request backlog" csock) 503)
     (socket-close csock)))
 
 (define (handle-client csock)
-  (guard (e [else (respond/ng (make-partial-request (~ e'message) csock) "500")])
+  (guard (e [else (respond/ng (make-partial-request (~ e'message) csock) 500)])
     (let* ([iport (socket-input-port csock)]
            [line (read-line (socket-input-port csock))])
       (rxmatch-case line
         [test eof-object?
-         (respond/ng (make-partial-request "client gone" csock) "400")]
+         (respond/ng (make-partial-request "client gone" csock) 400)]
         [#/^(GET|HEAD)\s+(\S+)\s+HTTP\/\d+\.\d+$/ (_ meth abs-path)
          (receive (auth path q frag) (uri-decompose-hierarchical abs-path)
            (let ([params (cgi-parse-parameters :query-string (or q ""))]
@@ -276,9 +276,9 @@
              (dispatch-handler (make-request line csock meth path params
                                              (rfc822-read-headers iport)))))]
         [#/^[A-Z]+.*/
-         (respond/ng (make-request line csock "" "" '() '()) "501")]
+         (respond/ng (make-request line csock "" "" '() '()) 501)]
         [else
-         (respond/ng (make-request line csock "" "" '() '()) "400")]))))
+         (respond/ng (make-request line csock "" "" '() '()) 400)]))))
 
 ;;;
 ;;; Logging
@@ -332,19 +332,19 @@
   (let1 rpath (sys-normalize-pathname (request-path req) :canonicalize #t)
     (if (or (string-prefix? "/../" rpath)
             (string=? "/.." rpath))
-      (respond/ng req "403")      ;do not allow path traversal
+      (respond/ng req 403)      ;do not allow path traversal
       (let1 fpath (sys-normalize-pathname #`",(docroot),rpath")
         (cond [(file-is-readable? fpath)
                (if (file-is-directory? fpath)
                  (%handle-directory req fpath rpath dirindex)
                  (respond/ok req `(file ,fpath)))]
-              [(file-exists? fpath) (respond/ng req "403")]
-              [else (respond/ng req "404")])))))
+              [(file-exists? fpath) (respond/ng req 403)]
+              [else (respond/ng req 404)])))))
 
 (define (%handle-directory req fpath rpath dirindex)
   (let loop ([ind dirindex])
     (match ind
-      [() (respond/ng req "403")]
+      [() (respond/ng req 403)]
       [(#t . _) (respond/ok req (%index-directory fpath rpath))]
       [(name . rest) (let1 f (build-path fpath name)
                        (if (file-is-readable? f)
