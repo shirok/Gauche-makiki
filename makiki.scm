@@ -44,6 +44,7 @@
   (use file.util)
   (use rfc.822)
   (use rfc.uri)
+  (use rfc.mime)
   (use text.html-lite)
   (use util.list)
   (use util.queue)
@@ -93,17 +94,22 @@
   remote-addr         ; remote address (sockaddr)
   method              ; request method
   path                ; request path
+  query               ; unparsed query string
   params              ; query parameters
   headers             ; request headers
   (status)            ; result status (set later)
-  (reply-size))       ; size of reply content in octets (set later)
+  (response-headers)  ; response headers (set later)
+  (response-size))    ; size of reply content in octets (set later)
 
-(define-inline (make-request line socket method path params headers)
+
+(define-inline (make-request line socket method path query headers)
   (%make-request line socket (socket-getpeername socket)
-                 method path params headers #f 0))
+                 method path (or query "")
+                 (cgi-parse-parameters :query-string (or query ""))
+                 headers #f '() 0))
 (define-inline (make-partial-request msg socket)
   (%make-request #`"#<error - ,|msg|>" socket (socket-getpeername socket)
-                 "" "" '() '() #f 0))
+                 "" "" "" '() '() #f '() 0))
 
 (define-inline (request-iport req) (socket-input-port (request-socket req)))
 (define-inline (request-oport req) (socket-output-port (request-socket req)))
@@ -159,7 +165,7 @@
 
 (define (%respond req code content-type content)
   (request-status-set! req code)
-  (request-reply-size-set! req (string-size content))
+  (request-response-size-set! req (string-size content))
   (let ([port (request-oport req)]
         [desc (hash-table-get *status-code-map* code "")])
     (define (p x) (display x port))
@@ -278,15 +284,14 @@
       (rxmatch-case line
         [test eof-object?
          (respond/ng (make-partial-request "client gone" csock) 400)]
-        [#/^(GET|HEAD)\s+(\S+)\s+HTTP\/\d+\.\d+$/ (_ meth abs-path)
+        [#/^(GET|HEAD|POST)\s+(\S+)\s+HTTP\/\d+\.\d+$/ (_ meth abs-path)
          (receive (auth path q frag) (uri-decompose-hierarchical abs-path)
-           (let ([params (cgi-parse-parameters :query-string (or q ""))]
-                 [path (uri-decode-string path :cgi-decode #t)])
-             (dispatch-handler (make-request line csock meth path params
+           (let1 path (uri-decode-string path :cgi-decode #t)
+             (dispatch-handler (make-request line csock meth path q
                                              (rfc822-read-headers iport))
                                app)))]
-        [#/^[A-Z]+.*/ (respond/ng (make-request line csock "" "" '() '()) 501)]
-        [else (respond/ng (make-request line csock "" "" '() '()) 400)]))))
+        [#/^[A-Z]+.*/ (respond/ng (make-request line csock "" "" "" '()) 501)]
+        [else (respond/ng (make-request line csock "" "" "" '()) 400)]))))
 
 ;;;
 ;;; Logging
@@ -319,7 +324,7 @@
                                 (logip (request-remote-addr r))
                                 (request-line r)
                                 (request-status r)
-                                (request-reply-size r)
+                                (request-response-size r)
                                 (logreferer r)
                                 (logdt (job-acknowledge-time j)
                                        (job-finish-time j))))]
@@ -347,9 +352,27 @@
 
 (define (logreferer req)
   (rfc822-header-ref (request-headers req) "referer" "-"))
-  
+
 ;;;
-;;; Built-in handlers
+;;; CGI adaptor
+;;;
+
+;; This works like www.cgi's cgi-main; sets up cgi metavariables
+;; and calls PROC with parsed params.  Returns a procedure that
+;; can be used as a handler of define-http-handler.
+;; (define (cgi-handler proc :key on-error merge-cookies output-proc)
+;;   (lambda (req m app)
+;;     (with-input-from-port (request-iport req)
+;;       (lambda ()
+;;         (parameterize ((cgi-metavariables
+;;                         `(("REQUEST_METHOD" ,(request-method req))
+;;                           ("QUERY_STRING"   ,(request-query req))
+;;                           ("REMOTE_ADDR"    ,(logip (request-remote-addr req))))
+;;                         ))
+;;           )))))
+
+;;;
+;;; Built-in file handler
 ;;;
 
 (define (file-handler :key (directory-index '("index.html" #t)))
