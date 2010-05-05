@@ -49,7 +49,9 @@
   (use util.queue)
   (use util.match)
   (use www.cgi)
-  (export start-http-server httpd-log-drain
+  (export start-http-server
+          access-log access-log-drain
+          error-log error-log-drain
           request?
           request-socket request-iport request-oport
           request-path request-params request-headers
@@ -69,12 +71,17 @@
 ;;; Logging
 ;;;
 
-(define httpd-log-drain (make-parameter #f))
+(define access-log-drain (make-parameter #f))
+(define error-log-drain (make-parameter #f))
 
-(define-macro (log fmt . args)
-  (let1 drain (gensym)
-    `(if-let1 ,drain (httpd-log-drain)
-       (log-format ,drain ,fmt ,@args))))
+(define-macro (define-log-macro name drain-param)
+  `(define-macro (,name fmt . args)
+     (let1 drain (gensym)
+       `(if-let1 ,drain (,,drain-param)
+          (log-format ,drain ,fmt ,@args)))))
+
+(define-log-macro access-log access-log-drain)
+(define-log-macro error-log error-log-drain)
 
 ;;;
 ;;; Request packet
@@ -157,7 +164,7 @@
         [desc (hash-table-get *status-code-map* code "")])
     (define (p x) (display x port))
     (define (crlf) (display "\r\n" port))
-    (guard (e [(<system-error> e) (log "response error ~s" e)])
+    (guard (e [(<system-error> e) (error-log "response error ~s" e)])
       (p "HTTP/1.1 ") (p code) (p " ") (p desc) (crlf)
       (p "Content-Type: ") (p content-type) (crlf)
       (p "Content-Length: ") (p (string-size content)) (crlf)
@@ -175,7 +182,7 @@
 ;; returns Request
 (define (respond/ok req body :optional (keepalive #f))
   (unwind-protect
-      (guard (e [else (log "respond/ok error ~s" (~ e'message))
+      (guard (e [else (error-log "respond/ok error ~s" (~ e'message))
                       (respond/ng req 500)])
         (match body
           [(? string?) (%respond req 200 "text/html; charset=utf-8" body)]
@@ -233,12 +240,12 @@
                                 (document-root ".")
                                 (num-threads 5)
                                 (max-backlog 10)
-                                (log-to #f)
+                                ((:access-log alog) #f)
+                                ((:error-log elog) #f)
                                 (app-data #f))
-  (parameterize ([httpd-log-drain
-                  (cond [(not log-to) #f]
-                        [(is-a? log-to <log-drain>) log-to]
-                        [else (make <log-drain> :path log-to :prefix "")])]
+  ;; see initial-log-drain for the possible values of :access-log and :error-log.
+  (parameterize ([access-log-drain (initial-log-drain alog 'access-log)]
+                 [error-log-drain (initial-log-drain elog 'error-log)]
                  [docroot document-root])
     (let* ([pool (tpool:make-thread-pool num-threads :max-backlog max-backlog)]
            [tlog (kick-logger-thread pool)]
@@ -251,7 +258,7 @@
                                (accept-client app-data (socket-accept s) pool))
                              '(r)))
             (while #t (selector-select sel)))
-        (log "terminating")
+        (access-log "~a: terminating" (logtime (current-time)))
         (for-each socket-close ssocks)
         (tpool:terminate-all! pool 300)
         (thread-terminate! tlog)))))
@@ -285,25 +292,40 @@
 ;;; Logging
 ;;;
 
+;; used in initialization to construct a log drain from a keyword arg
+;; to start-http-server.
+;; DEST can be #f (no log), #t (stdout), string (filename) or <log-drain>.
+;; For access log, <log-drain> is better not to have prefix, for timestamp
+;; is included in the message.
+(define (initial-log-drain dest kind)
+  (cond [(not dest) #f]
+        [(is-a? dest <log-drain>) dest]
+        [else (make <log-drain> :path dest
+                    :prefix (case kind
+                              [(access-log) ""]
+                              [(error-log) (^_ (logtime (current-time)))]
+                              ))]))
+
 (define (logger pool)
-  (guard (e [else (log "[internal] logger error: ~a" (~ e'message))])
+  (guard (e [else (error-log "[I] logger error: ~a" (~ e'message))])
     (let loop ()
       (let1 j (dequeue/wait! (~ pool'result-queue))
         (case (job-status j)
           [(done) (let1 r (job-result j)
                     (unless (request? r)
                       (error "some handler didn't return request:" r))
-                    (log "~a: ~a \"~a\" ~a ~a ~s ~a"
-                         (logtime (job-acknowledge-time j))
-                         (logip (request-remote-addr r))
-                         (request-line r)
-                         (request-status r)
-                         (request-reply-size r)
-                         (logreferer r)
-                         (logdt (job-acknowledge-time j) (job-finish-time j))))]
-          [(error) (log "[internal] job error: ~a" (~ (job-result j)'message))]
-          [(killed) (log "[internal] job killed: ~a" (job-result j))]
-          [else (log "[internal] unexpected job status: ~a" (job-status j))]))
+                    (access-log "~a: ~a \"~a\" ~a ~a ~s ~a"
+                                (logtime (job-acknowledge-time j))
+                                (logip (request-remote-addr r))
+                                (request-line r)
+                                (request-status r)
+                                (request-reply-size r)
+                                (logreferer r)
+                                (logdt (job-acknowledge-time j)
+                                       (job-finish-time j))))]
+          [(error) (error-log "[I] job error: ~a" (~ (job-result j)'message))]
+          [(killed) (error-log "[I] job killed: ~a" (job-result j))]
+          [else (error-log "[I] unexpected job status: ~a" (job-status j))]))
       (loop))
     (logger pool)))
 

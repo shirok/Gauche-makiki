@@ -15,7 +15,8 @@
 (define-http-handler #/./ (file-handler))
 
 (define (main args)
-  (start-http-server :log-to #t :app-data (sys-ctime (sys-time)))
+  (start-http-server :access-log #t :error-log #t
+                     :app-data (sys-ctime (sys-time)))
   0)
 
 ;; Local variables:
