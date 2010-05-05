@@ -305,11 +305,12 @@
 (define (initial-log-drain dest kind)
   (cond [(not dest) #f]
         [(is-a? dest <log-drain>) dest]
-        [else (make <log-drain> :path dest
-                    :prefix (case kind
-                              [(access-log) ""]
-                              [(error-log) (^_ (logtime (current-time)))]
-                              ))]))
+        [else
+         (make <log-drain> :path dest
+               :prefix (case kind
+                         [(access-log) ""]
+                         [(error-log) (^_ #`",(logtime (current-time)): ")]
+                         ))]))
 
 (define (logger pool)
   (guard (e [else (error-log "[I] logger error: ~a" (~ e'message))])
