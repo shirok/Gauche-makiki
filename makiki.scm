@@ -274,6 +274,7 @@
                              (lambda (fd condition)
                                (accept-client app-data (socket-accept s) pool))
                              '(r)))
+            (access-log "~a: started" (logtime (current-time)))
             (while #t (selector-select sel)))
         (access-log "~a: terminating" (logtime (current-time)))
         (for-each socket-close ssocks)
