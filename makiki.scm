@@ -220,9 +220,15 @@
    `("{",(intersperse
           ","
           (map (^p `(,(write-to-string (x->string (car p)))
-                     ":",(write-to-string (cdr p))))
+                     ":",(item->json (cdr p))))
                alist))
      "}")))
+
+(define (item->json item)
+  (match item
+    [#(elt ...)    `("[" ,@(intersperse "," (map item->json elt)) "]")]
+    [((x . y) . _) (alist->json item)]
+    [_ (write-to-string item)]))
 
 ;;;
 ;;; Handler mechanism
