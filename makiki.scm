@@ -302,7 +302,8 @@
              (dispatch-handler (make-request line csock meth path q
                                              (rfc822-read-headers iport))
                                app)))]
-        [#/^[A-Z]+.*/ (respond/ng (make-request line csock "" "" "" '()) 501)]
+        [#/^[A-Z]+.*/ ()
+          (respond/ng (make-request line csock "" "" "" '()) 501)]
         [else (respond/ng (make-request line csock "" "" "" '()) 400)]))))
 
 ;;;

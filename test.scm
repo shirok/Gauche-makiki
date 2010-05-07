@@ -4,6 +4,7 @@
 
 (use gauche.test)
 (use gauche.process)
+(use gauche.net)
 (use rfc.http)
 
 (test-start "makiki")
@@ -28,6 +29,21 @@
   (lambda (p)
     (test* "basic responds 404" "404"
            (values-ref (http-get *server* "/") 0))
+
+    (test* "bad request format" "HTTP/1.1 400 Bad Request"
+           (let1 s (make-client-socket 'inet "localhost" *port*)
+             (socket-shutdown s SHUT_WR)
+             (unwind-protect (read-line (socket-input-port s))
+               (socket-close s))))
+
+    (test* "bad request format" "HTTP/1.1 501 Not Implemented"
+           (let1 s (make-client-socket 'inet "localhost" *port*)
+             (unwind-protect
+                 (begin
+                   (display "PUT /foo.txt HTTP/1.1\r\n" (socket-output-port s))
+                   (socket-shutdown s SHUT_WR)
+                   (read-line (socket-input-port s)))
+               (socket-close s))))
     ))
 
 ;; epilogue
