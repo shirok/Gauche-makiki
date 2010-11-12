@@ -279,7 +279,7 @@
             (while #t (selector-select sel)))
         (access-log "~a: terminating" (logtime (current-time)))
         (for-each socket-close ssocks)
-        (tpool:terminate-all! pool 300)
+        (tpool:terminate-all! pool :force-timeout 300)
         (thread-terminate! tlog)))))
 
 (define (kick-logger-thread pool)
