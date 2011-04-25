@@ -1,0 +1,59 @@
+Gauche-makiki is a simple multithreded http server intended for
+applications that wants to provide http server capability easily.
+At this moment, the only required file is makiki.scm, so you can
+either install it as an ordinary Gauche extension library, or you
+can just copy the file into your application.
+
+To use the server, you should define 'http-handler' using
+define-http-handler macro:
+
+  (define-http-handler REGEXP PROC)
+
+For each incoming request, the server matches its path of
+the request uri against REGEXP, and if it matches, the server
+calls PROC with three arguments.
+
+  (proc REQUEST MATCH APP-DATA)
+
+REQUEST is a request record.  
+
+    (define-record-type request  %make-request #t
+      line                ; the first line of the request
+      socket              ; client socket
+      remote-addr         ; remote address (sockaddr)
+      method              ; request method
+      path                ; request path
+      query               ; unparsed query string
+      params              ; query parameters
+      headers             ; request headers
+      (status)            ; result status (set later)
+      (response-headers)  ; response headers (set later) (not used yet)
+      (response-size))    ; size of reply content in octets (set later)
+
+MATCH is the #<rxmatch> of the result of matching path component
+against REGEXP.  
+
+APP-DATA is an application-specific data given at the time the server
+is started.
+
+PROC should call either respond/ok or respond/ng at the tail
+position.   NB: These must be extended greatly to support various
+types of replies.
+
+  (respond/ok REQ BODY)   ; BODY can be <string>, (file <filename>),
+                          ;   (plain <lisp-object>), (json <alist>),
+                          ;   or text-tree (cf. text.tree)
+  (respond/ng REQ CODE)
+
+For the convenience, file-handler can be used to create a handler
+procedure suitable for define-http-handler to return a file
+on the server.
+
+  (file-handler :key directory-index)
+
+
+Finally, to start the server, call start-http-server.
+
+  (start-http-server :key host port document-root num-threads max-backlog
+                          access-log error-log app-data)
+
