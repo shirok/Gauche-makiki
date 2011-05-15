@@ -57,7 +57,7 @@
           request-socket request-iport request-oport
           request-path request-params request-headers
           respond/ng respond/ok
-          define-http-handler
+          define-http-handler add-http-handler!
           file-handler)
   )
 (select-module makiki)
@@ -236,10 +236,25 @@
 
 (define *handlers* (make-queue))
 
-;; handler :: Request Path-RxMatch -> IO ()
+;; The server program registers appropriate handlers.
+;;
+;;  handler :: Request Path-RxMatch -> IO ()
+;;
+;; The server test the request path against path-rx and calls matching handler.
+;; A handler can be defined declaratively:
+;;
+;;   (define-http-handler path-rx handler)
+;;
+;; Or can be registered procedurally:
+;;
+;;   (add-http-handler! path-rx handler)
+
 (define-syntax define-http-handler
   (syntax-rules ()
-    [(_ path-rx handler) (enqueue! *handlers* (cons path-rx handler))]))
+    [(_ path-rx handler) (add-http-handler! path-rx handler)]))
+
+(define (add-http-handler! path-rx handler)
+  (enqueue! *handlers* (cons path-rx handler)))
 
 (define (dispatch-handler req app)
   (let1 path (request-path req)
