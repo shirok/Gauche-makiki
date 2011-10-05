@@ -1,5 +1,5 @@
 ;;;
-;;;   Copyright (c) 2010 Shiro Kawai  <shiro@acm.org>
+;;;   Copyright (c) 2010-2011 Shiro Kawai  <shiro@acm.org>
 ;;;
 ;;;   Redistribution and use in source and binary forms, with or without
 ;;;   modification, are permitted provided that the following conditions
@@ -50,12 +50,12 @@
   (use util.queue)
   (use util.match)
   (use www.cgi)
-  (export start-http-server
+  (export start-http-server http-server-software
           access-log access-log-drain
           error-log error-log-drain
           request?
           request-socket request-iport request-oport
-          request-path request-params request-headers
+          request-path request-params request-headers request-header
           respond/ng respond/ok
           define-http-handler add-http-handler!
           file-handler)
@@ -67,6 +67,8 @@
 ;;;
 
 (define docroot (make-parameter "."))
+
+(define http-server-software (make-parameter "gauche/makiki"))
 
 ;;;
 ;;; Logging
@@ -113,6 +115,9 @@
 
 (define-inline (request-iport req) (socket-input-port (request-socket req)))
 (define-inline (request-oport req) (socket-output-port (request-socket req)))
+
+(define (request-header req header)
+  (rfc822-header-ref (request-headers req) header))
 
 ;;;
 ;;; Generating response
@@ -172,6 +177,7 @@
     (define (crlf) (display "\r\n" port))
     (guard (e [(<system-error> e) (error-log "response error ~s" e)])
       (p "HTTP/1.1 ") (p code) (p " ") (p desc) (crlf)
+      (p "Server: ") (p (http-server-software)) (crlf)
       (p "Content-Type: ") (p content-type) (crlf)
       (p "Content-Length: ") (p (string-size content)) (crlf)
       (crlf)
@@ -238,7 +244,7 @@
 
 ;; The server program registers appropriate handlers.
 ;;
-;;  handler :: Request Path-RxMatch -> IO ()
+;;  handler :: Request Path-RxMatch App -> IO ()
 ;;
 ;; The server test the request path against path-rx and calls matching handler.
 ;; A handler can be defined declaratively:
@@ -275,7 +281,7 @@
                                 ((:access-log alog) #f)
                                 ((:error-log elog) #f)
                                 (app-data #f))
-  ;; see initial-log-drain for the possible values of :access-log and :error-log.
+  ;; see initial-log-drain for the possible values of :access-log/:error-log.
   (parameterize ([access-log-drain (initial-log-drain alog 'access-log)]
                  [error-log-drain (initial-log-drain elog 'error-log)]
                  [docroot document-root])
@@ -387,19 +393,71 @@
 ;;; CGI adaptor
 ;;;
 
-;; This works like www.cgi's cgi-main; sets up cgi metavariables
-;; and calls PROC with parsed params.  Returns a procedure that
-;; can be used as a handler of define-http-handler.
-;; (define (cgi-handler proc :key on-error merge-cookies output-proc)
-;;   (lambda (req m app)
-;;     (with-input-from-port (request-iport req)
-;;       (lambda ()
-;;         (parameterize ((cgi-metavariables
-;;                         `(("REQUEST_METHOD" ,(request-method req))
-;;                           ("QUERY_STRING"   ,(request-query req))
-;;                           ("REMOTE_ADDR"    ,(logip (request-remote-addr req))))
-;;                         ))
-;;           )))))
+;; This can be used to call a cgi program's main procedure (PROC,
+;; with setting cgi metavariables and current i/o's. 
+;; We don't support http authentications yet.
+(define (cgi-handler proc :key (script-name ""))
+  (lambda (req m app)
+    (with-input-from-port (request-iport req)
+      (lambda ()
+        (parameterize ((cgi-metavariables
+                        (get-cgi-metavariables req script-name)))
+          (proc ""))))))
+
+;; Load file as a cgi script, and create a cgi handler that calls a
+;; procedure named by ENTRY-POINT inside the script.
+;; To avoid interference with makiki itself, the script is loaded
+;; into an anonymous module.
+;; Loading is done only once unless LOAD-EVERY-TIME is true.
+;; Usually, loading only once cuts the overhead of script loading for
+;; repeating requests.  However, if the cgi script sets some global
+;; state, it should be loaded for every request---a script can
+;; be executed concurrently, so any code relying on a shared mutable
+;; global state will fail.
+;; Note also that we assume the script itself isn't written inside
+;; a specific module; if it has it's own define-module and
+;; select-module, the module will be shared for every load, and
+;; we won't have enough isolation.
+(define (cgi-script file :key (entry-point 'main)
+                              (script-name "")
+                              (load-every-time #f))
+  (define (load-script) ;returns entry point procedure
+    (let1 mod (make-module #f)
+      (load file :environment mod)
+      (global-variable-ref mod entry-point)))
+
+  (if load-every-time
+    (lambda (req m app)
+      ((cgi-handler (load-script) :script-name script-name) req m app))
+    (cgi-handler (load-script) :script-name script-name)))
+     
+;; Sets up cgi metavariables.
+(define (get-cgi-metavariables req script-name)
+  (cond-list
+   ;; AUTH_TYPE - not supported yet
+   [(request-header req "content-length")
+    => (^v (list "CONTENT_LENGTH" (x->string v)))]
+   [(request-header req "content-type")
+    => (^v (list "CONTENT_LENGTH" (x->string v)))]
+   [#t `("GATEWAY_INTERFACE" "CGI/1.1")]
+   [#t `("PATH_INFO" ,(request-path req))]
+   [#t `("PATH_TRANSLATED" ;todo - flexible path trans.
+         ,(string-append (docroot) (request-path req)))]
+   [#t `("QUERY_STRING" ,(request-query req))]
+   [#t `("REMOTE_ADDR" ,(logip (request-remote-addr req)))]
+   [#t `("REMOTE_HOST"  ,(request-remote-addr req))]
+   ;; REMOTE_IDENT - not supported
+   ;; REMOTE_USER - not supported
+   [#t `("REQUEST_METHOD" ,(request-method req))]
+   [#t `("SCRIPT_NAME" ,script-name)]
+   ;; NB: for HTTP/1.1, the upper layer should reject the request if host
+   ;; header isn't present.  But just in case:
+   [#t `("SERVER_NAME" ,(or (request-header req "host") (sys-gethostname)))]
+   [#t `("SERVER_PORT" ,(x->string (sockaddr-port (socket-getsockname
+                                                   (request-socket req)))))]
+   [#t `("SERVER_PROTOCOL" "HTTP/1.1")]
+   [#t `("SERVER_SOFTWARE" ,(http-server-software))]
+   ))  
 
 ;;;
 ;;; Built-in file handler
