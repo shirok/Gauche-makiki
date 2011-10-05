@@ -259,7 +259,7 @@
 
 ;; The server program registers appropriate handlers.
 ;;
-;;  handler :: Request Path-RxMatch App -> IO ()
+;;  handler :: Request App -> IO ()
 ;;
 ;; The server test the request path against path-rx and calls matching handler.
 ;; A handler can be defined declaratively:
