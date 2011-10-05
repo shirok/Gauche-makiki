@@ -5,7 +5,7 @@
 (use text.html-lite)
 
 (define-http-handler #/^\/$/
-  (lambda (req match app)
+  (lambda (req app)
     (respond/ok req
                 (html:html
                  (html:head (html:title "Makiki"))

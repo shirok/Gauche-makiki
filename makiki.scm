@@ -54,9 +54,12 @@
           access-log access-log-drain
           error-log error-log-drain
           request?
-          request-socket request-iport request-oport
-          request-path request-params request-headers request-header
+          request-socket request-iport request-oport request-method
+          request-host request-path request-path-rxmatch
+          request-params request-headers
+          request-header-ref
           respond/ng respond/ok
+          response-header-push! response-header-delete!
           define-http-handler add-http-handler!
           file-handler)
   )
@@ -95,7 +98,9 @@
   socket              ; client socket
   remote-addr         ; remote address (sockaddr)
   method              ; request method
+  host                ; request host
   path                ; request path
+  path-rxmatch        ; #<rxmatch> object of matched path
   query               ; unparsed query string
   params              ; query parameters
   headers             ; request headers
@@ -104,20 +109,27 @@
   (response-size))    ; size of reply content in octets (set later)
 
 
-(define-inline (make-request line socket method path query headers)
+(define-inline (make-request line socket method path rxmatch query headers)
   (%make-request line socket (socket-getpeername socket)
-                 method path (or query "")
+                 method "" path rxmatch (or query "")
                  (cgi-parse-parameters :query-string (or query ""))
                  headers #f '() 0))
 (define-inline (make-partial-request msg socket)
   (%make-request #`"#<error - ,|msg|>" socket (socket-getpeername socket)
-                 "" "" "" '() '() #f '() 0))
+                 "" "" "" #f "" '() '() #f '() 0))
 
 (define-inline (request-iport req) (socket-input-port (request-socket req)))
 (define-inline (request-oport req) (socket-output-port (request-socket req)))
 
-(define (request-header req header)
-  (rfc822-header-ref (request-headers req) header))
+;; some convenience accessors
+(define (request-header-ref req header-name :optional (default #f))
+  (rfc822-header-ref (request-headers req) header-name default))
+
+(define (response-header-push! req header-name value)
+  (push! (request-response-headers req) (list header-name value)))
+
+(define (response-header-delete! req header-name)
+  (update! (request-response-headers req) (cut delete header-name <>)))
 
 ;;;
 ;;; Generating response
@@ -180,6 +192,9 @@
       (p "Server: ") (p (http-server-software)) (crlf)
       (p "Content-Type: ") (p content-type) (crlf)
       (p "Content-Length: ") (p (string-size content)) (crlf)
+      (dolist [h (request-response-headers req)]
+        (dolist [v (cdr h)]
+          (p (car h)) (p ": ") (p v) (crlf)))
       (crlf)
       (p content)
       (flush port))))
@@ -262,12 +277,11 @@
 (define (add-http-handler! path-rx handler)
   (enqueue! *handlers* (cons path-rx handler)))
 
-(define (dispatch-handler req app)
-  (let1 path (request-path req)
-    (or (any-in-queue (^p (cond [((car p) path) => (cut (cdr p) req <> app)]
-                                [else #f]))
-                      *handlers*)
-        (respond/ng req 404))))
+;; returns (handler rxmatch)
+(define (find-handler path)
+  (any-in-queue (^p (and-let* ([m ((car p) path)])
+                      `(,(cdr p) ,m)))
+                *handlers*))
 
 ;;;
 ;;; Main loop
@@ -281,7 +295,7 @@
                                 ((:access-log alog) #f)
                                 ((:error-log elog) #f)
                                 (app-data #f))
-  ;; see initial-log-drain for the possible values of :access-log/:error-log.
+  ;; see initial-log-drain for the possible values of access-log and error-log.
   (parameterize ([access-log-drain (initial-log-drain alog 'access-log)]
                  [error-log-drain (initial-log-drain elog 'error-log)]
                  [docroot document-root])
@@ -319,14 +333,19 @@
         [test eof-object?
          (respond/ng (make-partial-request "client gone" csock) 400)]
         [#/^(GET|HEAD|POST)\s+(\S+)\s+HTTP\/\d+\.\d+$/ (_ meth abs-path)
-         (receive (auth path q frag) (uri-decompose-hierarchical abs-path)
-           (let1 path (uri-decode-string path :cgi-decode #t)
-             (dispatch-handler (make-request line csock meth path q
-                                             (rfc822-read-headers iport))
-                               app)))]
+         (receive (auth path query frag) (uri-decompose-hierarchical abs-path)
+           (let* ([path (uri-decode-string path :cgi-decode #t)]
+                  [handler&match (find-handler path)]
+                  [req (make-request line csock meth path
+                                     (cond [handler&match => cdr] [else #f])
+                                     query
+                                     (rfc822-read-headers iport))])
+             (if handler&match
+               ((car handler&match) req app)
+               (respond/ng req 404))))]
         [#/^[A-Z]+.*/ ()
-          (respond/ng (make-request line csock "" "" "" '()) 501)]
-        [else (respond/ng (make-request line csock "" "" "" '()) 400)]))))
+          (respond/ng (make-partial-request line csock) 501)]
+        [else (respond/ng (make-partial-request line csock) 400)]))))
 
 ;;;
 ;;; Logging
@@ -435,9 +454,9 @@
 (define (get-cgi-metavariables req script-name)
   (cond-list
    ;; AUTH_TYPE - not supported yet
-   [(request-header req "content-length")
+   [(request-header-ref req "content-length")
     => (^v (list "CONTENT_LENGTH" (x->string v)))]
-   [(request-header req "content-type")
+   [(request-header-ref req "content-type")
     => (^v (list "CONTENT_LENGTH" (x->string v)))]
    [#t `("GATEWAY_INTERFACE" "CGI/1.1")]
    [#t `("PATH_INFO" ,(request-path req))]
@@ -452,7 +471,7 @@
    [#t `("SCRIPT_NAME" ,script-name)]
    ;; NB: for HTTP/1.1, the upper layer should reject the request if host
    ;; header isn't present.  But just in case:
-   [#t `("SERVER_NAME" ,(or (request-header req "host") (sys-gethostname)))]
+   [#t `("SERVER_NAME" ,(or (request-header-ref req "host") (sys-gethostname)))]
    [#t `("SERVER_PORT" ,(x->string (sockaddr-port (socket-getsockname
                                                    (request-socket req)))))]
    [#t `("SERVER_PROTOCOL" "HTTP/1.1")]
@@ -464,9 +483,9 @@
 ;;;
 
 (define (file-handler :key (directory-index '("index.html" #t)))
-  (lambda (req m app) (%handle-file req m directory-index)))
+  (lambda (req app) (%handle-file req directory-index)))
 
-(define (%handle-file req m dirindex)
+(define (%handle-file req dirindex)
   (let1 rpath (sys-normalize-pathname (request-path req) :canonicalize #t)
     (if (or (string-prefix? "/../" rpath)
             (string=? "/.." rpath))

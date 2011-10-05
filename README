@@ -13,7 +13,7 @@ For each incoming request, the server matches its path of
 the request uri against REGEXP, and if it matches, the server
 calls PROC with three arguments.
 
-  (proc REQUEST MATCH APP-DATA)
+  (proc REQUEST APP-DATA)
 
 REQUEST is a request record.  
 
@@ -22,16 +22,15 @@ REQUEST is a request record.
       socket              ; client socket
       remote-addr         ; remote address (sockaddr)
       method              ; request method
+      host                ; request host (not filled in the current version yet)
       path                ; request path
+      path-rxmatch        ; #<rxmatch> object of matched path
       query               ; unparsed query string
       params              ; query parameters
       headers             ; request headers
       (status)            ; result status (set later)
       (response-headers)  ; response headers (set later) (not used yet)
       (response-size))    ; size of reply content in octets (set later)
-
-MATCH is the #<rxmatch> of the result of matching path component
-against REGEXP.  
 
 APP-DATA is an application-specific data given at the time the server
 is started.
