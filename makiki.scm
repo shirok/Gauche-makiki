@@ -337,7 +337,7 @@
            (let* ([path (uri-decode-string path :cgi-decode #t)]
                   [handler&match (find-handler path)]
                   [req (make-request line csock meth path
-                                     (cond [handler&match => cdr] [else #f])
+                                     (cond [handler&match => cadr] [else #f])
                                      query
                                      (rfc822-read-headers iport))])
              (if handler&match
