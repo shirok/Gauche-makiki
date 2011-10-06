@@ -22,27 +22,59 @@ REQUEST is a request record.
       socket              ; client socket
       remote-addr         ; remote address (sockaddr)
       method              ; request method
-      host                ; request host (not filled in the current version yet)
+      server-host         ; server hostname
+      server-port         ; server port
       path                ; request path
       path-rxmatch        ; #<rxmatch> object of matched path
       query               ; unparsed query string
       params              ; query parameters
       headers             ; request headers
       (status)            ; result status (set later)
-      (response-headers)  ; response headers (set later) (not used yet)
+      (response-headers)  ; response headers (set later)
       (response-size))    ; size of reply content in octets (set later)
 
 APP-DATA is an application-specific data given at the time the server
 is started.
 
-PROC should call either respond/ok or respond/ng at the tail
+The following convenience procedures are avaiable on the request record.
+
+  (request-iport REQ)     ; input port to read from the client
+  (request-oport REQ)     ; output port to write to the client.
+                          ;  NB: the handler proc shouldn't write
+                          ;  to this port normally---one of the 
+                          ;  'respond' procedures below takes care of
+                          ;  writing response line and headers.
+  (request-header-ref REQ HEADER-NAME :optional (DEFAULT #f))
+                          ; retrieve the value from the request headers.
+
+The handler procedure can set/modify response headers using
+the following procedures.
+
+  (response-header-push! REQ HEADER-NAME VALUE)
+  (response-header-delete! REQ HEADER-NAME)
+  (response-header-replace! REQ HEADER-NAME VALUE)           
+
+PROC should call one of the following respond procedure at the tail
 position.   NB: These must be extended greatly to support various
 types of replies.
 
   (respond/ok REQ BODY)   ; BODY can be <string>, (file <filename>),
                           ;   (plain <lisp-object>), (json <alist>),
                           ;   or text-tree (cf. text.tree)
-  (respond/ng REQ CODE)
+                          ; This returns 200 response to the client,
+                          ; with the specified content.
+
+  (respond/ng REQ CODE)   ; This returns CODE response to the client.
+                          ; the body consists of the description of the
+                          ; HTTP code.
+
+  (respond/redirect REQ URI :optional (CODE 302))
+                          ; Send back a redirection message using Location
+                          ; header.  URI can be an absolute uri or
+                          ; just a path component; in the latter case,
+                          ; protocol, host and port compoents are 
+                          ; automatically added.
+
 
 For the convenience, file-handler can be used to create a handler
 procedure suitable for define-http-handler to return a file
