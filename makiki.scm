@@ -35,6 +35,7 @@
   (use gauche.logger)
   (use gauche.selector)
   (use gauche.threads)
+  (use gauche.experimental.app) ; remove this after Gauche-0.9.3
   (use control.job)
   (use control.thread-pool :prefix tpool:)
   (use srfi-1)
@@ -45,6 +46,7 @@
   (use rfc.822)
   (use rfc.uri)
   (use rfc.mime)
+  (use rfc.json)
   (use text.html-lite)
   (use util.list)
   (use util.queue)
@@ -55,11 +57,13 @@
           error-log error-log-drain
           request?
           request-socket request-iport request-oport request-method
-          request-host request-path request-path-rxmatch
+          request-server-host request-server-port
+          request-path request-path-rxmatch
           request-params request-headers
           request-header-ref
-          respond/ng respond/ok
+          respond/ng respond/ok respond/redirect
           response-header-push! response-header-delete!
+          response-header-replace!
           define-http-handler add-http-handler!
           file-handler)
   )
@@ -98,7 +102,8 @@
   socket              ; client socket
   remote-addr         ; remote address (sockaddr)
   method              ; request method
-  host                ; request host
+  server-host         ; request host
+  server-port         ; request port
   path                ; request path
   path-rxmatch        ; #<rxmatch> object of matched path
   query               ; unparsed query string
@@ -109,14 +114,17 @@
   (response-size))    ; size of reply content in octets (set later)
 
 
-(define-inline (make-request line socket method path rxmatch query headers)
-  (%make-request line socket (socket-getpeername socket)
-                 method "" path rxmatch (or query "")
-                 (cgi-parse-parameters :query-string (or query ""))
-                 headers #f '() 0))
+(define-inline (make-request line socket method host:port path
+                             rxmatch query headers)
+  (rxmatch-let (#/(.*)(:\d+)?$/ host:port) [_ h p]
+    (%make-request line socket (socket-getpeername socket)
+                   method h (if p (x->integer p) 80)
+                   path rxmatch (or query "")
+                   (cgi-parse-parameters :query-string (or query ""))
+                   headers #f '() 0)))
 (define-inline (make-partial-request msg socket)
   (%make-request #`"#<error - ,|msg|>" socket (socket-getpeername socket)
-                 "" "" "" #f "" '() '() #f '() 0))
+                 "" "" 80 "" #f "" '() '() #f '() 0))
 
 (define-inline (request-iport req) (socket-input-port (request-socket req)))
 (define-inline (request-oport req) (socket-output-port (request-socket req)))
@@ -130,6 +138,10 @@
 
 (define (response-header-delete! req header-name)
   (update! (request-response-headers req) (cut delete header-name <>)))
+
+(define (response-header-replace! req header-name value)
+  (response-header-delete! req header-name)
+  (response-header-push! req header-name value))
 
 ;;;
 ;;; Generating response
@@ -180,23 +192,34 @@
               '(505 . "HTTP Version Not Supported")
               ))
 
+;; content can be a string or (<size> <string> ...)
+;; In the latter format, you can pass output in the chunks of strings.
+;; <size> must be the sum of entire output.
+;; NB: taking advantage of the lazy sequence in Gauche 0.9.3, you can
+;; lazily feed the file content to the client.
 (define (%respond req code content-type content)
   (request-status-set! req code)
-  (request-response-size-set! req (string-size content))
+  (request-response-size-set! req (cond
+                                   [(string? content) (string-size content)]
+                                   [(pair? content) (car content)]))
   (let ([port (request-oport req)]
         [desc (hash-table-get *status-code-map* code "")])
     (define (p x) (display x port))
     (define (crlf) (display "\r\n" port))
-    (guard (e [(<system-error> e) (error-log "response error ~s" e)])
+    (guard (e [(<system-error> e) (error-log "response error ~s: ~a"
+                                             (class-name (class-of e))
+                                             (~ e'message))])
       (p "HTTP/1.1 ") (p code) (p " ") (p desc) (crlf)
       (p "Server: ") (p (http-server-software)) (crlf)
       (p "Content-Type: ") (p content-type) (crlf)
-      (p "Content-Length: ") (p (string-size content)) (crlf)
+      (p "Content-Length: ") (p (request-response-size req)) (crlf)
       (dolist [h (request-response-headers req)]
         (dolist [v (cdr h)]
           (p (car h)) (p ": ") (p v) (crlf)))
       (crlf)
-      (p content)
+      (cond
+       [(string? content) (p content)]
+       [(pair? content) (dolist [chunk (cdr content)] (p chunk))])
       (flush port))))
 
 ;; returns Request
@@ -214,16 +237,15 @@
         (match body
           [(? string?) (%respond req 200 "text/html; charset=utf-8" body)]
           [('file filename)
-           (let* ([ctype (rxmatch-case filename
+           (let ([ctype (rxmatch-case filename
                            [#/\.js$/ () "application/javascript; charset=uft-8"]
                            [#/\.png$/ () "image/png"]
                            [#/\.jpg$/ () "image/jpeg"]
                            [#/\.css$/ () "text/css"]
+                           [#/\.(mpg|mpeg)$/ () "video/mpeg"]
                            [#/\.html$/ () "text/html; charset=uft-8"]
                            [else "text/plain"])] ;ideally use file magic
-                  [size (file-size filename)]
-                  [content (and size (with-input-from-file filename
-                                       (cut read-block size)))])
+                 [content (%fetch-file-content filename)])
              (if content
                (%respond req 200 ctype content)
                (respond/ng req 404)))]
@@ -236,6 +258,9 @@
         req)
     (unless keepalive (socket-close (request-socket req)))))
 
+;; NB: We can't use rfc.json due to the bug exists until Gauche-0.9.2.
+;; After releasing 0.9.3, discard these and replace the call of alist->json
+;; to compose-json-string.
 (define (alist->json alist)
   (tree->string
    `("{",(intersperse
@@ -250,6 +275,27 @@
     [#(elt ...)    `("[" ,@(intersperse "," (map item->json elt)) "]")]
     [((x . y) . _) (alist->json item)]
     [_ (write-to-string item)]))
+
+;; Returns file contents, or #f if we can't read the file.
+;; If file contents is too large, we chunk them.  After releasing Gauche-0.9.3,
+;; we can return a lazy sequence.
+(define-constant +chunk-size+ 131072)
+(define (%fetch-file-content filename)
+  (and-let* ([size (file-size filename)])
+    (if (<= size +chunk-size+)
+      (file->string filename)
+      (cons size (file->list (cut read-block +chunk-size+ <>) filename)))))
+
+;; Redirect.  URI can be an absolute uri or absolute path.
+;; returns Request
+(define (respond/redirect req uri :optional (code 302))
+  (let1 target (uri-merge (uri-compose :scheme "http"
+                                       :host (request-server-host req)
+                                       :port (let1 p (request-server-port req)
+                                               (if (= p 80) #f p)))
+                          uri)
+    (response-header-replace! req "location" target)
+    (respond/ng req code)))
 
 ;;;
 ;;; Handler mechanism
@@ -306,7 +352,7 @@
           (let1 sel (make <selector>)
             (dolist [s ssocks]
               (selector-add! sel (socket-fd s)
-                             (lambda (fd condition)
+                             (^[fd condition]
                                (accept-client app-data (socket-accept s) pool))
                              '(r)))
             (access-log "~a: started on ~a" (logtime (current-time))
@@ -336,10 +382,12 @@
          (receive (auth path query frag) (uri-decompose-hierarchical abs-path)
            (let* ([path (uri-decode-string path :cgi-decode #t)]
                   [handler&match (find-handler path)]
-                  [req (make-request line csock meth path
+                  [hdrs (rfc822-read-headers iport)]
+                  [host ($ rfc822-header-ref hdrs "host"
+                           $ sockaddr-name $ socket-getsockname csock)]
+                  [req (make-request line csock meth host path
                                      (cond [handler&match => cadr] [else #f])
-                                     query
-                                     (rfc822-read-headers iport))])
+                                     query hdrs)])
              (if handler&match
                ((car handler&match) req app)
                (respond/ng req 404))))]
@@ -416,11 +464,11 @@
 ;; with setting cgi metavariables and current i/o's. 
 ;; We don't support http authentications yet.
 (define (cgi-handler proc :key (script-name ""))
-  (lambda (req m app)
+  (^[req app]
     (with-input-from-port (request-iport req)
-      (lambda ()
-        (parameterize ((cgi-metavariables
-                        (get-cgi-metavariables req script-name)))
+      (^[]
+        (parameterize ([cgi-metavariables
+                        (get-cgi-metavariables req script-name)])
           (proc ""))))))
 
 ;; Load file as a cgi script, and create a cgi handler that calls a
@@ -446,8 +494,8 @@
       (global-variable-ref mod entry-point)))
 
   (if load-every-time
-    (lambda (req m app)
-      ((cgi-handler (load-script) :script-name script-name) req m app))
+    (^[req app]
+      ((cgi-handler (load-script) :script-name script-name) req app))
     (cgi-handler (load-script) :script-name script-name)))
      
 ;; Sets up cgi metavariables.
@@ -469,11 +517,8 @@
    ;; REMOTE_USER - not supported
    [#t `("REQUEST_METHOD" ,(request-method req))]
    [#t `("SCRIPT_NAME" ,script-name)]
-   ;; NB: for HTTP/1.1, the upper layer should reject the request if host
-   ;; header isn't present.  But just in case:
-   [#t `("SERVER_NAME" ,(or (request-header-ref req "host") (sys-gethostname)))]
-   [#t `("SERVER_PORT" ,(x->string (sockaddr-port (socket-getsockname
-                                                   (request-socket req)))))]
+   [#t `("SERVER_NAME" ,(request-server-host req))]
+   [#t `("SERVER_PORT" ,(request-server-port req))]
    [#t `("SERVER_PROTOCOL" "HTTP/1.1")]
    [#t `("SERVER_SOFTWARE" ,(http-server-software))]
    ))  
@@ -483,7 +528,7 @@
 ;;;
 
 (define (file-handler :key (directory-index '("index.html" #t)))
-  (lambda (req app) (%handle-file req directory-index)))
+  (^[req app] (%handle-file req directory-index)))
 
 (define (%handle-file req dirindex)
   (let1 rpath (sys-normalize-pathname (request-path req) :canonicalize #t)
