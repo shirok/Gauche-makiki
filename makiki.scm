@@ -51,6 +51,7 @@
   (use util.list)
   (use util.queue)
   (use util.match)
+  (use sxml.tools)
   (use www.cgi)
   (export start-http-server http-server-software
           access-log access-log-drain
@@ -253,6 +254,8 @@
                                   (write-to-string obj display))]
           [('json alist) (%respond req 200 "application/json; charset=uft-8"
                                    (alist->json alist))]
+          [('sxml node) (%respond req 200 "text/html; charset=utf-8"
+                                  (tree->string (sxml:sxml->html node)))]
           [else (%respond req 200 "text/html; charset=utf-8"
                           (tree->string body))])
         req)
@@ -527,11 +530,12 @@
 ;;; Built-in file handler
 ;;;
 
-(define (file-handler :key (directory-index '("index.html" #t)))
-  (^[req app] (%handle-file req directory-index)))
+(define (file-handler :key (directory-index '("index.html" #t))
+                           (path-trans request-path))
+  (^[req app] (%handle-file req directory-index path-trans)))
 
-(define (%handle-file req dirindex)
-  (let1 rpath (sys-normalize-pathname (request-path req) :canonicalize #t)
+(define (%handle-file req dirindex path-trans)
+  (let1 rpath (sys-normalize-pathname (path-trans req) :canonicalize #t)
     (if (or (string-prefix? "/../" rpath)
             (string=? "/.." rpath))
       (respond/ng req 403)      ;do not allow path traversal
@@ -547,22 +551,23 @@
   (let loop ([ind dirindex])
     (match ind
       [() (respond/ng req 403)]
-      [(#t . _) (respond/ok req (%index-directory fpath rpath))]
+      [(#t . _)
+       (respond/ok req (%index-directory (request-path req) fpath rpath))]
       [(name . rest) (let1 f (build-path fpath name)
                        (if (file-is-readable? f)
                          (respond/ok req `(file ,f))
                          (loop rest)))])))
 
-(define (%index-directory fpath rpath)
+(define (%index-directory showpath fpath rpath)
   (receive (dirs files) (directory-list2 fpath)
     (html:html
-     (html:head (html:title rpath))
+     (html:head (html:title showpath))
      (html:body
-      (html:h1 rpath)
+      (html:h1 showpath)
       (html:hr)
       (html:ul
-       (map (cut %render-file-entry <> rpath "/") dirs)
-       (map (cut %render-file-entry <> rpath "") files))))))
+       (map (cut %render-file-entry <> showpath "/") dirs)
+       (map (cut %render-file-entry <> showpath "") files))))))
 
 (define (%render-file-entry name rpath suffix)
   (html:li
