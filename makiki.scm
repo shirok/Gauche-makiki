@@ -117,7 +117,7 @@
 
 (define-inline (make-request line socket method host:port path
                              rxmatch query headers)
-  (rxmatch-let (#/(.*)(:\d+)?$/ host:port) [_ h p]
+  (rxmatch-let (#/^([^:]*)(?::(\d+))?$/ host:port) [_ h p]
     (%make-request line socket (socket-getpeername socket)
                    method h (if p (x->integer p) 80)
                    path rxmatch (or query "")
