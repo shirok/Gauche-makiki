@@ -1,23 +1,84 @@
 #!/usr/bin/env gosh
 
+;;
+;; Sample web server to show how to use makiki.  Run it in the
+;; top source directory of Gauche-makiki.
+;;
+
 (add-load-path ".")
-(use makiki)
+(use gauche.threads)
 (use text.html-lite)
+(use srfi-1)
+(use www.cgi)
+(use makiki)
 
-(define-http-handler #/^\/$/
-  (lambda (req app)
-    (respond/ok req
-                (html:html
-                 (html:head (html:title "Makiki"))
-                 (html:body (html:h1 "You're running Makiki http server")
-                            (html:p "The server is running since " app))))))
-
-(define-http-handler #/./ (file-handler))
-
+;; main program just starts the server.
+;; logs goes to stdout (:access-log #t :error-log #t)
+;; we pass the timestamp to :app-data - it is avaliable to the 'app'
+;;  argument in the http handlers below.
 (define (main args)
   (start-http-server :access-log #t :error-log #t
                      :app-data (sys-ctime (sys-time)))
   0)
+
+;; The root path handler.  We show some html, constructed by text.html-lite.
+(define-http-handler #/^\/$/
+  (^[req app]
+    (respond/ok req
+                (html:html
+                 (html:head (html:title "Makiki"))
+                 (html:body (html:h1 "You're running Makiki http server")
+                            (html:p "The server is running since " app
+                                    "at port " (request-server-port req)
+                                    " on host " (request-server-host req)
+                                    ".")
+                            (html:a :href "/src/"
+                                    "Browse makiki source"))))))
+
+;; The path '/src/' shows the current directory and below.
+;; We pass the proc to extract path below '/src' to the :path-trans
+;; arg of file-handler, which will interpret the translated path relative
+;; to the document-root, which defaults to ".".
+(define-http-handler #/^\/src(\/.*)$/
+  (file-handler :path-trans (^[req] ((request-path-rxmatch req) 1))))
+
+;; Redirect "/src" to "/src/".
+(define-http-handler #/\/src$/
+  (^[req app] (respond/redirect req "/src/")))
+  
+;; The '/wall' shows simple form handling.
+;; Here consider only GET parameters.  See below for handling POST parameters.
+
+(define *wall* (atom '()))  ;; ((name timestamp message) ...)
+
+(define-http-handler #/\/wall$/
+  (^[req app]
+    (let ([name (cgi-get-parameter "name" (request-params req))]
+          [message (cgi-get-parameter "message" (request-params req))])
+      (when (and name message)
+        (atomic-update! *wall* (cut cons `(,name ,(sys-time) ,message) <>)))
+      (respond/ok req (atomic *wall* render-wall)))))
+
+(define (render-wall msgs)
+  (define (render-entry name timestamp message)
+    `((dt (b ,name) " "
+          "(",(sys-strftime "%Y/%m/%d %H:%M:%S" (sys-localtime timestamp))")")
+      (dd ,message)))
+  `(sxml
+    (html
+     (head (title "wall"))
+     (body
+      (form (@ (method "GET") (action "/wall"))
+            (table (tr (th "Name:")
+                       (td (input (@ (type "text") (name "name")))))
+                   (tr (th "Message:")
+                       (td (textarea (@ (name "message") (cols 60)) "")))
+                   (tr (td)
+                       (td (input (@ (type "submit") (name "s") (value "Write")))))))
+      (dl ,@(append-map (pa$ apply render-entry) msgs))))))
+
+
+        
 
 ;; Local variables:
 ;; mode: scheme
