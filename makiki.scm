@@ -123,23 +123,31 @@
                    path rxmatch (or query "")
                    (cgi-parse-parameters :query-string (or query ""))
                    headers #f '() 0)))
+
 (define-inline (make-partial-request msg socket)
   (%make-request #`"#<error - ,|msg|>" socket (socket-getpeername socket)
                  "" "" 80 "" #f "" '() '() #f '() 0))
 
+;; API
 (define-inline (request-iport req) (socket-input-port (request-socket req)))
+
+;; API
 (define-inline (request-oport req) (socket-output-port (request-socket req)))
 
 ;; some convenience accessors
+;; API
 (define (request-header-ref req header-name :optional (default #f))
   (rfc822-header-ref (request-headers req) header-name default))
 
+;; API
 (define (response-header-push! req header-name value)
   (push! (request-response-headers req) (list header-name value)))
 
+;; API
 (define (response-header-delete! req header-name)
   (update! (request-response-headers req) (cut delete header-name <>)))
 
+;; API
 (define (response-header-replace! req header-name value)
   (response-header-delete! req header-name)
   (response-header-push! req header-name value))
@@ -223,6 +231,7 @@
        [(pair? content) (dolist [chunk (cdr content)] (p chunk))])
       (flush port))))
 
+;; API
 ;; returns Request
 (define (respond/ng req code :optional (keepalive #f))
   (%respond req code "text/plain; charset=utf-8"
@@ -230,6 +239,7 @@
   (unless keepalive (socket-close (request-socket req)))
   req)
 
+;; API
 ;; returns Request
 (define (respond/ok req body :optional (keepalive #f))
   (unwind-protect
@@ -289,6 +299,7 @@
       (file->string filename)
       (cons size (file->list (cut read-block +chunk-size+ <>) filename)))))
 
+;; API
 ;; Redirect.  URI can be an absolute uri or absolute path.
 ;; returns Request
 (define (respond/redirect req uri :optional (code 302))
@@ -304,7 +315,7 @@
 ;;; Handler mechanism
 ;;;
 
-(define *handlers* (make-queue))
+(define *handlers* (make-mtqueue))
 
 ;; The server program registers appropriate handlers.
 ;;
@@ -319,10 +330,12 @@
 ;;
 ;;   (add-http-handler! path-rx handler)
 
+;; API
 (define-syntax define-http-handler
   (syntax-rules ()
     [(_ path-rx handler) (add-http-handler! path-rx handler)]))
 
+;; API
 (define (add-http-handler! path-rx handler)
   (enqueue! *handlers* (cons path-rx handler)))
 
@@ -336,6 +349,7 @@
 ;;; Main loop
 ;;;
 
+;; API
 (define (start-http-server :key (host #f)
                                 (port 8080)
                                 (document-root ".")
@@ -463,7 +477,7 @@
 ;;; CGI adaptor
 ;;;
 
-;; This can be used to call a cgi program's main procedure (PROC,
+;; This can be used to call a cgi program's main procedure PROC,
 ;; with setting cgi metavariables and current i/o's. 
 ;; We don't support http authentications yet.
 (define (cgi-handler proc :key (script-name ""))
@@ -530,6 +544,7 @@
 ;;; Built-in file handler
 ;;;
 
+;; API
 (define (file-handler :key (directory-index '("index.html" #t))
                            (path-trans request-path))
   (^[req app] (%handle-file req directory-index path-trans)))
