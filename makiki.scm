@@ -249,12 +249,12 @@
           [(? string?) (%respond req 200 "text/html; charset=utf-8" body)]
           [('file filename)
            (let ([ctype (rxmatch-case filename
-                           [#/\.js$/ () "application/javascript; charset=uft-8"]
+                           [#/\.js$/ () "application/javascript; charset=utf-8"]
                            [#/\.png$/ () "image/png"]
                            [#/\.jpg$/ () "image/jpeg"]
                            [#/\.css$/ () "text/css"]
                            [#/\.(mpg|mpeg)$/ () "video/mpeg"]
-                           [#/\.html$/ () "text/html; charset=uft-8"]
+                           [#/\.html$/ () "text/html; charset=utf-8"]
                            [else "text/plain"])] ;ideally use file magic
                  [content (%fetch-file-content filename)])
              (if content
@@ -262,7 +262,7 @@
                (respond/ng req 404)))]
           [('plain obj) (%respond req 200 "text/plain; charset=utf-8"
                                   (write-to-string obj display))]
-          [('json alist) (%respond req 200 "application/json; charset=uft-8"
+          [('json alist) (%respond req 200 "application/json; charset=utf-8"
                                    (alist->json alist))]
           [('sxml node) (%respond req 200 "text/html; charset=utf-8"
                                   (tree->string (sxml:sxml->html node)))]
