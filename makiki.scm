@@ -46,6 +46,7 @@
   (use rfc.822)
   (use rfc.uri)
   (use rfc.mime)
+  (use rfc.cookie)
   (use rfc.json)
   (use text.html-lite)
   (use util.list)
@@ -60,11 +61,13 @@
           request-socket request-iport request-oport request-method
           request-server-host request-server-port
           request-path request-path-rxmatch
-          request-params request-headers
-          request-header-ref
+          request-params
+          request-headers request-header-ref
+          request-cookies request-cookie-ref
           respond/ng respond/ok respond/redirect
           response-header-push! response-header-delete!
           response-header-replace!
+          response-cookie-add! response-cookie-delete!
           define-http-handler add-http-handler!
           file-handler)
   )
@@ -99,6 +102,7 @@
 ;;;
 
 (define-record-type request  %make-request #t
+  ;; public slots
   line                ; the first line of the request
   socket              ; client socket
   remote-addr         ; remote address (sockaddr)
@@ -110,9 +114,12 @@
   query               ; unparsed query string
   params              ; query parameters
   headers             ; request headers
-  (status)            ; result status (set later)
-  (response-headers)  ; response headers (set later)
-  (response-size))    ; size of reply content in octets (set later)
+  ;; private slots
+  (cookies %request-cookies) ; promise of alist of parsed cookies
+  (send-cookies)      ; alist of cookie spec (set by handler)
+  (status)            ; result status (set by responder)
+  (response-headers)  ; response headers (set by handler)
+  (response-size))    ; size of reply content in octets (set by responder)
 
 
 (define-inline (make-request line socket method host:port path
@@ -122,7 +129,8 @@
                    method h (if p (x->integer p) 80)
                    path rxmatch (or query "")
                    (cgi-parse-parameters :query-string (or query ""))
-                   headers #f '() 0)))
+                   headers (delay (%request-parse-cookies headers)) '()
+                   #f '() 0)))
 
 (define-inline (make-partial-request msg socket)
   (%make-request #`"#<error - ,|msg|>" socket (socket-getpeername socket)
@@ -145,12 +153,36 @@
 
 ;; API
 (define (response-header-delete! req header-name)
-  (update! (request-response-headers req) (cut delete header-name <>)))
+  (update! (request-response-headers req)
+           (cut remove (^e (equal? (car e) header-name)) <>)))
 
 ;; API
 (define (response-header-replace! req header-name value)
   (response-header-delete! req header-name)
   (response-header-push! req header-name value))
+
+;; Cookie utilities
+(define (%request-parse-cookies headers)
+  (parse-cookie-string (or (rfc822-header-ref headers "cookie")
+                           (rfc822-header-ref headers "cookie2")
+                           "")))
+
+;; API
+(define (request-cookies req) (force (%request-cookies req)))
+
+;; API
+(define (request-cookie-ref req name :optional (default #f))
+  (or (assoc name (request-cookies req)) default))
+
+;; API
+(define (response-cookie-add! req name value . options)
+  (response-cookie-delete! req name)
+  (push! (request-send-cookies req) `(,name ,value ,@options)))
+
+;; API
+(define (response-cookie-delete! req name)
+  (update! (request-send-cookies req)
+           (cut remove (^e (equal? (car e) name)) <>)))
 
 ;;;
 ;;; Generating response
@@ -222,6 +254,9 @@
       (p "Server: ") (p (http-server-software)) (crlf)
       (p "Content-Type: ") (p content-type) (crlf)
       (p "Content-Length: ") (p (request-response-size req)) (crlf)
+      (cond [(request-send-cookies req) pair?
+             => (^[cs] ($ map (cut response-header-push! req "set-cookie" <>)
+                          $ construct-cookie-string cs))])
       (dolist [h (request-response-headers req)]
         (dolist [v (cdr h)]
           (p (car h)) (p ": ") (p v) (crlf)))
