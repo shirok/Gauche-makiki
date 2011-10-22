@@ -61,7 +61,7 @@
           request-socket request-iport request-oport request-method
           request-server-host request-server-port
           request-path request-path-rxmatch
-          request-params
+          request-params request-response-error
           request-headers request-header-ref
           request-cookies request-cookie-ref
           respond/ng respond/ok respond/redirect
@@ -114,6 +114,7 @@
   query               ; unparsed query string
   params              ; query parameters
   headers             ; request headers
+  (response-error)    ; #f if response successfully sent, #<error> otherwise.
   ;; private slots
   (cookies %request-cookies) ; promise of alist of parsed cookies
   (send-cookies)      ; alist of cookie spec (set by handler)
@@ -129,12 +130,13 @@
                    method h (if p (x->integer p) 80)
                    path rxmatch (or query "")
                    (cgi-parse-parameters :query-string (or query ""))
-                   headers (delay (%request-parse-cookies headers)) '()
+                   headers #f
+                   (delay (%request-parse-cookies headers)) '()
                    #f '() 0)))
 
 (define-inline (make-partial-request msg socket)
   (%make-request #`"#<error - ,|msg|>" socket (socket-getpeername socket)
-                 "" "" 80 "" #f "" '() '() #f '() 0))
+                 "" "" 80 "" #f "" '() '() #f '() '() #f '() 0))
 
 ;; API
 (define-inline (request-iport req) (socket-input-port (request-socket req)))
@@ -247,9 +249,12 @@
         [desc (hash-table-get *status-code-map* code "")])
     (define (p x) (display x port))
     (define (crlf) (display "\r\n" port))
-    (guard (e [(<system-error> e) (error-log "response error ~s: ~a"
-                                             (class-name (class-of e))
-                                             (~ e'message))])
+    (guard (e [(and (<system-error> e) (eqv? (~ e'errno) EPIPE))
+               (error-log "response error ~s: ~a" (class-name (class-of e))
+                          (~ e'message))
+               (close-output-port (request-oport req))
+               (close-input-port (request-iport req))
+               (set! (request-response-error req) e)])
       (p "HTTP/1.1 ") (p code) (p " ") (p desc) (crlf)
       (p "Server: ") (p (http-server-software)) (crlf)
       (p "Content-Type: ") (p content-type) (crlf)
