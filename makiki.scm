@@ -115,6 +115,8 @@
   params              ; query parameters
   headers             ; request headers
   (response-error)    ; #f if response successfully sent, #<error> otherwise.
+                      ;  set by respond/* procedures.  The handler can check
+                      ;  this slot and take actions in case of an error.
   ;; private slots
   (cookies %request-cookies) ; promise of alist of parsed cookies
   (send-cookies)      ; alist of cookie spec (set by handler)

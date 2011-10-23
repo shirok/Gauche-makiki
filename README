@@ -1,5 +1,5 @@
 Gauche-makiki is a simple multithreded http server intended for
-applications that wants to provide http server capability easily.
+applications that want to provide http server capability easily.
 At this moment, the only required file is makiki.scm, so you can
 either install it as an ordinary Gauche extension library, or you
 can just copy the file into your application.
@@ -11,27 +11,28 @@ define-http-handler macro:
 
 For each incoming request, the server matches its path of
 the request uri against REGEXP, and if it matches, the server
-calls PROC with three arguments.
+calls PROC with two arguments.
 
   (proc REQUEST APP-DATA)
 
-REQUEST is a request record.  
+REQUEST is a request record (only publicly exposed slots are shown):
 
-    (define-record-type request  %make-request #t
-      line                ; the first line of the request
-      socket              ; client socket
-      remote-addr         ; remote address (sockaddr)
-      method              ; request method
-      server-host         ; server hostname
-      server-port         ; server port
-      path                ; request path
-      path-rxmatch        ; #<rxmatch> object of matched path
-      query               ; unparsed query string
-      params              ; query parameters
-      headers             ; request headers
-      (status)            ; result status (set later)
-      (response-headers)  ; response headers (set later)
-      (response-size))    ; size of reply content in octets (set later)
+  (define-record-type request  %make-request #t
+    line                ; the first line of the request
+    socket              ; client socket
+    remote-addr         ; remote address (sockaddr)
+    method              ; request method
+    server-host         ; request host
+    server-port         ; request port
+    path                ; request path
+    path-rxmatch        ; #<rxmatch> object of matched path
+    query               ; unparsed query string
+    params              ; query parameters
+    headers             ; request headers
+    (response-error)    ; #f if response successfully sent, #<error> otherwise.
+                        ;  set by respond/* procedures.  The handler can check
+                        ;  this slot and take actions in case of an error.
+    ...)
 
 APP-DATA is an application-specific data given at the time the server
 is started.
@@ -46,13 +47,24 @@ The following convenience procedures are avaiable on the request record.
                           ;  writing response line and headers.
   (request-header-ref REQ HEADER-NAME :optional (DEFAULT #f))
                           ; retrieve the value from the request headers.
+  (request-cookies REQ)   ; returns parsed cookie list (see rfc.cookie)
+                          ; in the request.
+  (request-cookie-ref REQ COOKIE-NAME :optional (DEFAULT #f))
+                          ; returns one entry of the parsed cookie with
+                          ; the given COOKIE-NAME.
 
 The handler procedure can set/modify response headers using
 the following procedures.
 
   (response-header-push! REQ HEADER-NAME VALUE)
   (response-header-delete! REQ HEADER-NAME)
-  (response-header-replace! REQ HEADER-NAME VALUE)           
+  (response-header-replace! REQ HEADER-NAME VALUE)
+  (response-cookie-add! REQ NAME VALUE . COOKIE-OPTIONS)
+  (response-cookie-delete! REQ NAME)
+
+(NB: response-cookie-delete! merely removes the named cookie form
+the response message; it does not remove the cookie from the client.)
+
 
 PROC should call one of the following respond procedure at the tail
 position.   NB: These must be extended greatly to support various
@@ -75,12 +87,25 @@ types of replies.
                           ; protocol, host and port compoents are 
                           ; automatically added.
 
+These procedures return after entire message is sent.  If an error
+occurs during sending the message (most likely because the client
+has disconnected prematurely), an error condition is stored in
+(request-response-error REQ).
+
 
 For the convenience, file-handler can be used to create a handler
 procedure suitable for define-http-handler to return a file
 on the server.
 
-  (file-handler :key directory-index)
+  (file-handler :key (directory-index '("index.html" #t))
+                     (path-trans request-path))
+
+PATH-TRANS should be a procedure that takes REQUEST and returns
+the server-side file path.  The returned path should start from
+slash, and the document-root directory passed to the start-http-server
+is prepended to it.  It is not allowed to go above the document
+root directory by "/../../.." etc---403 error message would results.
+
 
 
 Finally, to start the server, call start-http-server.
