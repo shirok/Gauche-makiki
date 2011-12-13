@@ -35,7 +35,9 @@
   (use gauche.logger)
   (use gauche.selector)
   (use gauche.threads)
+  (use gauche.uvector)
   (use gauche.experimental.app) ; remove this after Gauche-0.9.3
+  (use gauche.vport)
   (use control.job)
   (use control.thread-pool :prefix tpool:)
   (use srfi-1)
@@ -69,7 +71,7 @@
           response-header-replace!
           response-cookie-add! response-cookie-delete!
           define-http-handler add-http-handler!
-          file-handler)
+          file-handler cgi-handler cgi-script)
   )
 (select-module makiki)
 
@@ -237,19 +239,24 @@
               '(505 . "HTTP Version Not Supported")
               ))
 
-;; content can be a string or (<size> <string> ...)
-;; In the latter format, you can pass output in the chunks of strings.
-;; <size> must be the sum of entire output.
+;; <content> : <chunk> | (<size> <chunk> ...)
+;; <chunk>   : <string> | <u8vector>
+;;
+;; If the chunk is a list, the first element <size> must be the size of
+;; the entire output.  (In future, we allow #f here and use chunked output.)
 ;; NB: taking advantage of the lazy sequence in Gauche 0.9.3, you can
 ;; lazily feed the file content to the client.
 (define (%respond req code content-type content)
   (request-status-set! req code)
-  (request-response-size-set! req (cond
-                                   [(string? content) (string-size content)]
-                                   [(pair? content) (car content)]))
+  (request-response-size-set! req
+                              (cond
+                               [(string? content) (string-size content)]
+                               [(u8vector? content) (u8vector-length content)]
+                               [(pair? content) (car content)]
+                               [else (error "invalid response content:" content)]))
   (let ([port (request-oport req)]
         [desc (hash-table-get *status-code-map* code "")])
-    (define (p x) (display x port))
+    (define (p x) (if (u8vector? x) (write-block x port) (display x port)))
     (define (crlf) (display "\r\n" port))
     (guard (e [(and (<system-error> e) (eqv? (~ e'errno) EPIPE))
                (error-log "response error ~s: ~a" (class-name (class-of e))
@@ -269,13 +276,13 @@
           (p (car h)) (p ": ") (p v) (crlf)))
       (crlf)
       (cond
-       [(string? content) (p content)]
+       [(or (string? content) (u8vector? content)) (p content)]
        [(pair? content) (dolist [chunk (cdr content)] (p chunk))])
       (flush port))))
 
 ;; API
 ;; returns Request
-(define (respond/ng req code :optional (keepalive #f))
+(define (respond/ng req code :key (keepalive #f))
   (%respond req code "text/plain; charset=utf-8"
             (hash-table-get *status-code-map* code ""))
   (unless keepalive (socket-close (request-socket req)))
@@ -283,33 +290,45 @@
 
 ;; API
 ;; returns Request
-(define (respond/ok req body :optional (keepalive #f))
+(define (respond/ok req body :key (keepalive #f) (content-type #f))
+  (define (resp ctype body) (%respond req 200 (or content-type ctype) body))
   (unwind-protect
       (guard (e [else (error-log "respond/ok error ~s" (~ e'message))
                       (respond/ng req 500)])
         (match body
-          [(? string?) (%respond req 200 "text/html; charset=utf-8" body)]
+          [(? string?) (resp "text/html; charset=utf-8" body)]
+          [(? u8vector?) (resp "application/binary" body)]
           [('file filename)
            (let ([ctype (rxmatch-case filename
-                           [#/\.js$/ () "application/javascript; charset=utf-8"]
-                           [#/\.png$/ () "image/png"]
-                           [#/\.jpg$/ () "image/jpeg"]
-                           [#/\.css$/ () "text/css"]
-                           [#/\.(mpg|mpeg)$/ () "video/mpeg"]
-                           [#/\.html$/ () "text/html; charset=utf-8"]
-                           [else "text/plain"])] ;ideally use file magic
+                          [#/\.js$/ () "application/javascript; charset=utf-8"]
+                          [#/\.png$/ () "image/png"]
+                          [#/\.jpg$/ () "image/jpeg"]
+                          [#/\.css$/ () "text/css"]
+                          [#/\.(mpg|mpeg)$/ () "video/mpeg"]
+                          [#/\.html$/ () "text/html; charset=utf-8"]
+                          [else "text/plain"])] ;ideally use file magic
                  [content (%fetch-file-content filename)])
              (if content
-               (%respond req 200 ctype content)
+               (resp ctype content)
                (respond/ng req 404)))]
-          [('plain obj) (%respond req 200 "text/plain; charset=utf-8"
-                                  (write-to-string obj display))]
-          [('json alist) (%respond req 200 "application/json; charset=utf-8"
-                                   (alist->json alist))]
-          [('sxml node) (%respond req 200 "text/html; charset=utf-8"
-                                  (tree->string (sxml:sxml->html node)))]
-          [else (%respond req 200 "text/html; charset=utf-8"
-                          (tree->string body))])
+          [('plain obj) (resp "text/plain; charset=utf-8"
+                              (write-to-string obj display))]
+          [('json alist)(resp "application/json; charset=utf-8"
+                              (alist->json alist))]
+          [('sxml node) (resp "text/html; charset=utf-8"
+                              (tree->string (sxml:sxml->html node)))]
+          [('chunks . chunks)
+           ;; NB: Once we support chunked output, we don't need to calculate
+           ;; the total length.
+           (resp "application/octet-stream" ; take safe side for the default
+                 `(,(fold (^[c s]
+                            (+ s (cond [(string? c) (string-size c)]
+                                       [(u8vector? c) (uvector-size c)]
+                                       [else (error "invalid chunk:" c)])))
+                          0 chunks)
+                   ,@chunks))]
+          [((? symbol? y) .  _) (error "invalid response body type:" y)]
+          [else (resp "text/html; charset=utf-8" (tree->string body))])
         req)
     (unless keepalive (socket-close (request-socket req)))))
 
@@ -318,11 +337,10 @@
 ;; to compose-json-string.
 (define (alist->json alist)
   (tree->string
-   `("{",(intersperse
-          ","
-          (map (^p `(,(write-to-string (x->string (car p)))
-                     ":",(item->json (cdr p))))
-               alist))
+   `("{",($ intersperse ","
+            $ map (^p `(,(write-to-string (x->string (car p)))
+                        ":",(item->json (cdr p))))
+                  alist)
      "}")))
 
 (define (item->json item)
@@ -523,12 +541,41 @@
 ;; with setting cgi metavariables and current i/o's. 
 ;; We don't support http authentications yet.
 (define (cgi-handler proc :key (script-name ""))
+  ;; NB: We should be able to get away from concatenating entire output---
+  ;; for future extension.
+  (define (uvector-concatenate uvs)
+    (let1 dest (make-u8vector (fold (^[v s] (+ (u8vector-length v) s)) 0 uvs))
+      (let loop ([pos 0] [uvs uvs])
+        (cond [(null? uvs) dest]
+              [else (u8vector-copy! dest pos (car uvs))
+                    (loop (+ pos (u8vector-length (car uvs))) (cdr uvs))]))))
+  (define (header+content vec)
+    (let* ([p (open-input-uvector vec)]
+           [hdrs (rfc822-read-headers p)]
+           [pos (port-tell p)])
+      (values hdrs
+              (uvector-alias <u8vector> vec pos)
+              (- (u8vector-length vec) pos))))
   (^[req app]
-    (with-input-from-port (request-iport req)
-      (^[]
-        (parameterize ([cgi-metavariables
-                        (get-cgi-metavariables req script-name)])
-          (proc ""))))))
+    (let1 q (make-queue)
+      (with-input-from-port (request-iport req)
+        (^[]
+          (let1 r (parameterize ([cgi-metavariables
+                                  (get-cgi-metavariables req script-name)]
+                                 [current-output-port
+                                  (make <buffered-output-port>
+                                    :flush (^[v f] (enqueue! q v)
+                                                   (u8vector-length v)))])
+                    (unwind-protect (proc "")
+                      (close-output-port (current-output-port))))
+            (if (zero? r)
+              (receive (hdrs content content-length)
+                  (header+content (uvector-concatenate (dequeue-all! q)))
+                (dolist [h hdrs] (response-header-push! req (car h) (cadr h)))
+                (respond/ok req content
+                            :content-type
+                            (rfc822-header-ref hdrs "content-type")))
+              (respond/ng req 500))))))))
 
 ;; Load file as a cgi script, and create a cgi handler that calls a
 ;; procedure named by ENTRY-POINT inside the script.
