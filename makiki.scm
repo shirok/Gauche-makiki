@@ -302,10 +302,11 @@
            (let ([ctype (rxmatch-case filename
                           [#/\.js$/ () "application/javascript; charset=utf-8"]
                           [#/\.png$/ () "image/png"]
-                          [#/\.jpg$/ () "image/jpeg"]
+                          [#/\.(jpg|jpeg)$/ () "image/jpeg"]
                           [#/\.css$/ () "text/css"]
                           [#/\.(mpg|mpeg)$/ () "video/mpeg"]
-                          [#/\.html$/ () "text/html; charset=utf-8"]
+                          [#/\.wav$/ () "audio/wav"]
+                          [#/\.(html|htm)$/ () "text/html; charset=utf-8"]
                           [else "text/plain"])] ;ideally use file magic
                  [content (%fetch-file-content filename)])
              (if content
