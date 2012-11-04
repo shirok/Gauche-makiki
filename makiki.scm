@@ -36,7 +36,7 @@
   (use gauche.selector)
   (use gauche.threads)
   (use gauche.uvector)
-  (use gauche.experimental.app) ; remove this after Gauche-0.9.3
+  (use gauche.generator)
   (use gauche.vport)
   (use control.job)
   (use control.thread-pool :prefix tpool:)
@@ -108,7 +108,7 @@
   line                ; the first line of the request
   socket              ; client socket
   remote-addr         ; remote address (sockaddr)
-  method              ; request method
+  method              ; request method (uppercase symbol)
   server-host         ; request host
   server-port         ; request port
   path                ; request path
@@ -131,7 +131,8 @@
                              rxmatch query headers)
   (rxmatch-let (#/^([^:]*)(?::(\d+))?$/ host:port) [_ h p]
     (%make-request line socket (socket-getpeername socket)
-                   method h (if p (x->integer p) 80)
+                   (string->symbol (string-upcase method))
+                   h (if p (x->integer p) 80)
                    path rxmatch (or query "")
                    (cgi-parse-parameters :query-string (or query ""))
                    headers #f
@@ -275,9 +276,10 @@
         (dolist [v (cdr h)]
           (p (car h)) (p ": ") (p v) (crlf)))
       (crlf)
-      (cond
-       [(or (string? content) (u8vector? content)) (p content)]
-       [(pair? content) (dolist [chunk (cdr content)] (p chunk))])
+      (unless (eq? (request-method req) 'HEAD)
+        (cond
+         [(or (string? content) (u8vector? content)) (p content)]
+         [(pair? content) (dolist [chunk (cdr content)] (p chunk))]))
       (flush port))))
 
 ;; API
@@ -292,6 +294,7 @@
 ;; returns Request
 (define (respond/ok req body :key (keepalive #f) (content-type #f))
   (define (resp ctype body) (%respond req 200 (or content-type ctype) body))
+  (define has-body? (not (eq? (request-method req) 'HEAD)))
   (unwind-protect
       (guard (e [else (error-log "respond/ok error ~s" (~ e'message))
                       (respond/ng req 500)])
@@ -308,7 +311,7 @@
                           [#/\.wav$/ () "audio/wav"]
                           [#/\.(html|htm)$/ () "text/html; charset=utf-8"]
                           [else "text/plain"])] ;ideally use file magic
-                 [content (%fetch-file-content filename)])
+                 [content (%fetch-file-content filename has-body?)])
              (if content
                (resp ctype content)
                (respond/ng req 404)))]
@@ -350,15 +353,16 @@
     [((x . y) . _) (alist->json item)]
     [_ (write-to-string item)]))
 
-;; Returns file contents, or #f if we can't read the file.
-;; If file contents is too large, we chunk them.  After releasing Gauche-0.9.3,
-;; we can return a lazy sequence.
-(define-constant +chunk-size+ 131072)
-(define (%fetch-file-content filename)
+;; Returns file contents as a lazy list of chunks, or #f
+;; if we can't read the file.
+(define-constant +chunk-size+ 65536)
+(define (%fetch-file-content filename has-body?)
   (and-let* ([size (file-size filename)])
-    (if (<= size +chunk-size+)
-      (file->string filename)
-      (cons size (file->list (cut read-block +chunk-size+ <>) filename)))))
+    (cond [(not has-body?) (list size)] ;let %respond use only the size info
+          [(<= size +chunk-size+) (file->string filename)]
+          [else
+           ($ cons size $ generator->lseq
+              $ file->generator filename (cut read-block +chunk-size+ <>))])))
 
 ;; API
 ;; Redirect.  URI can be an absolute uri or absolute path.
@@ -450,7 +454,8 @@
     (socket-close csock)))
 
 (define (handle-client app csock)
-  (guard (e [else (respond/ng (make-partial-request (~ e'message) csock) 500)])
+  (guard (e [else (error-log "handle-client error ~s" (~ e'message))
+                  (respond/ng (make-partial-request (~ e'message) csock) 500)])
     (let* ([iport (socket-input-port csock)]
            [line (read-line (socket-input-port csock))])
       (rxmatch-case line
