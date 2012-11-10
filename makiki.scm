@@ -71,7 +71,8 @@
           response-header-replace!
           response-cookie-add! response-cookie-delete!
           define-http-handler add-http-handler!
-          file-handler cgi-handler cgi-script)
+          file-handler cgi-handler cgi-script
+          with-header-handler)
   )
 (select-module makiki)
 
@@ -139,8 +140,8 @@
                    (delay (%request-parse-cookies headers)) '()
                    #f '() 0)))
 
-(define-inline (make-partial-request msg socket)
-  (%make-request #`"#<error - ,|msg|>" socket (socket-getpeername socket)
+(define-inline (make-ng-request msg socket)
+  (%make-request msg socket (socket-getpeername socket)
                  "" "" 80 "" #f "" '() '() #f '() '() #f '() 0))
 
 ;; API
@@ -284,10 +285,13 @@
 
 ;; API
 ;; returns Request
-(define (respond/ng req code :key (keepalive #f))
-  (%respond req code "text/plain; charset=utf-8"
-            (hash-table-get *status-code-map* code ""))
-  (unless keepalive (socket-close (request-socket req)))
+;; If no-response, close connection immediately without sending response.
+(define (respond/ng req code :key (keepalive #f) (no-response #f))
+  (unless no-response
+    (%respond req code "text/plain; charset=utf-8"
+              (hash-table-get *status-code-map* code "")))
+  (unless (and keepalive (not no-response))
+    (socket-close (request-socket req)))
   req)
 
 ;; API
@@ -451,17 +455,19 @@
 
 (define (accept-client app csock pool)
   (unless (tpool:add-job! pool (cut handle-client app csock) #t)
-    (respond/ng (make-partial-request "too many request backlog" csock) 503)
+    (respond/ng (make-ng-request "[E] too many request backlog" csock) 503)
     (socket-close csock)))
 
 (define (handle-client app csock)
-  (guard (e [else (error-log "handle-client error ~s" (~ e'message))
-                  (respond/ng (make-partial-request (~ e'message) csock) 500)])
+  (guard (e [else
+             (error-log "handle-client error ~s" (~ e'message))
+             (respond/ng (make-ng-request #`"[E] ,(~ e'message)" csock) 500)])
     (let* ([iport (socket-input-port csock)]
            [line (read-line (socket-input-port csock))])
       (rxmatch-case line
         [test eof-object?
-         (respond/ng (make-partial-request "client gone" csock) 400)]
+         (respond/ng (make-ng-request "(empty request)" csock) 400
+                     :no-response #t)]
         [#/^(GET|HEAD|POST)\s+(\S+)\s+HTTP\/\d+\.\d+$/ (_ meth abs-path)
          (receive (auth path query frag) (uri-decompose-hierarchical abs-path)
            (let* ([path (uri-decode-string path :cgi-decode #t)]
@@ -476,8 +482,8 @@
                ((car handler&match) req app)
                (respond/ng req 404))))]
         [#/^[A-Z]+.*/ ()
-          (respond/ng (make-partial-request line csock) 501)]
-        [else (respond/ng (make-partial-request line csock) 400)]))))
+          (respond/ng (make-ng-request #`"[E] ,line" csock) 501)]
+        [else (respond/ng (make-ng-request #`"[E] ,line" csock) 400)]))))
 
 ;;;
 ;;; Logging
@@ -686,3 +692,17 @@
   (html:li
    (html:a :href (build-path rpath name)
            (html-escape-string (string-append name suffix)))))
+
+;;;
+;;; Adds header
+;;;
+
+(define (with-header-handler inner-handler . header&values)
+  (^[req app]
+    (dolist [h&v (slices header&values 2 :fill? #t)]
+      (if-let1 val (if (or (string? (cadr h&v)) (not (cadr h&v)))
+                     (cadr h&v)
+                     ((cadr h&v) req app))
+        (response-header-push! req (x->string (car h&v)) val)))
+    (inner-handler req app)))
+

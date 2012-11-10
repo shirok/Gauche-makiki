@@ -100,6 +100,8 @@ has disconnected prematurely), an error condition is stored in
 
 # Build-in handlers
 
+## Serving files
+
 For the convenience, file-handler can be used to create a handler
 procedure suitable for define-http-handler to return a file
 on the server.
@@ -112,6 +114,24 @@ the server-side file path.  The returned path should start from
 slash, and the document-root directory passed to the start-http-server
 is prepended to it.  It is not allowed to go above the document
 root directory by `"/../../.."` etc---403 error message would results.
+
+## Modifying headers
+
+  (with-header-handler inner-handler header value ...)
+
+This returns a handler that first adds extra response headers
+then calls INNER-HANDLER.
+
+Header is a keyword representing the header name; value can
+be a string for header value, a procedure to take request and
+app-data and to return a string header value, or #f to omit the
+header.  For example, the following call returns a handler
+that adds "Cache-control: public" header to the file response.
+
+  (with-header-handler (file-handler) :cache-control "public")
+
+Since that the headers are added before the inner handler is called,
+they may be overwritten by inner-handler.
 
 
 # Starting the server
