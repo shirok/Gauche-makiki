@@ -422,13 +422,14 @@
                                 (max-backlog 10)
                                 ((:access-log alog) #f)
                                 ((:error-log elog) #f)
+                                (forwarded? #f)
                                 (app-data #f))
   ;; see initial-log-drain for the possible values of access-log and error-log.
   (parameterize ([access-log-drain (initial-log-drain alog 'access-log)]
                  [error-log-drain (initial-log-drain elog 'error-log)]
                  [docroot document-root])
     (let* ([pool (tpool:make-thread-pool num-threads :max-backlog max-backlog)]
-           [tlog (kick-logger-thread pool)]
+           [tlog (kick-logger-thread pool forwarded?)]
            [ssocks (make-server-sockets host port :reuse-addr? #t)])
       (unwind-protect
           (let1 sel (make <selector>)
@@ -445,8 +446,8 @@
         (tpool:terminate-all! pool :force-timeout 300)
         (thread-terminate! tlog)))))
 
-(define (kick-logger-thread pool)
-  (thread-start! (make-thread (cut logger pool))))
+(define (kick-logger-thread pool forwarded?)
+  (thread-start! (make-thread (cut logger pool forwarded?))))
 
 (define (accept-client app csock pool)
   (unless (tpool:add-job! pool (cut handle-client app csock) #t)
@@ -497,7 +498,7 @@
                          [(error-log) (^_ #`",(logtime (current-time)): ")]
                          ))]))
 
-(define (logger pool)
+(define (logger pool forwarded?)
   (guard (e [else (error-log "[I] logger error: ~a" (~ e'message))])
     (let loop ()
       (let1 j (dequeue/wait! (~ pool'result-queue))
@@ -507,7 +508,9 @@
                       (error "some handler didn't return request:" r))
                     (access-log "~a: ~a \"~a\" ~a ~a ~s ~a"
                                 (logtime (job-acknowledge-time j))
-                                (logip (request-remote-addr r))
+                                (or (and forwarded?
+                                         (request-header-ref r "x-forwarded-for"))
+                                    (logip (request-remote-addr r)))
                                 (request-line r)
                                 (request-status r)
                                 (request-response-size r)

@@ -1,21 +1,26 @@
+# Overview
+
 Gauche-makiki is a simple multithreded http server intended for
 applications that want to provide http server capability easily.
-At this moment, the only required file is makiki.scm, so you can
+At this moment, the only required file is `makiki.scm`, so you can
 either install it as an ordinary Gauche extension library, or you
 can just copy the file into your application.
 
-To use the server, you should define 'http-handler' using
-define-http-handler macro:
+
+# Handling requests
+
+To use the server, you should define _http-handler_ using
+`define-http-handler` macro:
 
   (define-http-handler REGEXP PROC)
 
 For each incoming request, the server matches its path of
-the request uri against REGEXP, and if it matches, the server
-calls PROC with two arguments.
+the request uri against `REGEXP`, and if it matches, the server
+calls `PROC` with two arguments.
 
   (proc REQUEST APP-DATA)
 
-REQUEST is a request record (only publicly exposed slots are shown):
+`REQUEST` is a request record (only publicly exposed slots are shown):
 
   (define-record-type request  %make-request #t
     line                ; the first line of the request
@@ -34,7 +39,7 @@ REQUEST is a request record (only publicly exposed slots are shown):
                         ;  this slot and take actions in case of an error.
     ...)
 
-APP-DATA is an application-specific data given at the time the server
+`APP-DATA` is an application-specific data given at the time the server
 is started.
 
 The following convenience procedures are avaiable on the request record.
@@ -62,11 +67,11 @@ the following procedures.
   (response-cookie-add! REQ NAME VALUE . COOKIE-OPTIONS)
   (response-cookie-delete! REQ NAME)
 
-(NB: response-cookie-delete! merely removes the named cookie form
+(NB: `response-cookie-delete!` merely removes the named cookie form
 the response message; it does not remove the cookie from the client.)
 
 
-PROC should call one of the following respond procedure at the tail
+`PROC` should call one of the following respond procedure at the tail
 position.   NB: These must be extended greatly to support various
 types of replies.
 
@@ -93,6 +98,8 @@ has disconnected prematurely), an error condition is stored in
 (request-response-error REQ).
 
 
+# Build-in handlers
+
 For the convenience, file-handler can be used to create a handler
 procedure suitable for define-http-handler to return a file
 on the server.
@@ -100,16 +107,48 @@ on the server.
   (file-handler :key (directory-index '("index.html" #t))
                      (path-trans request-path))
 
-PATH-TRANS should be a procedure that takes REQUEST and returns
+`PATH-TRANS` should be a procedure that takes `REQUEST` and returns
 the server-side file path.  The returned path should start from
 slash, and the document-root directory passed to the start-http-server
 is prepended to it.  It is not allowed to go above the document
-root directory by "/../../.." etc---403 error message would results.
+root directory by `"/../../.."` etc---403 error message would results.
 
 
+# Starting the server
 
-Finally, to start the server, call start-http-server.
+Finally, to start the server, call `start-http-server`.
 
   (start-http-server :key host port document-root num-threads max-backlog
-                          access-log error-log app-data)
+                          access-log error-log forwarded? app-data)
+
+
+  host (#f or string), port (integer) - Passed to make-server-sockets
+     of gauche.net to open the server socket.  The default values are
+     #f and 8080.
+
+  document-root - used to specify the root of the document served
+     by file-handler.  The default is the process's working directory.
+
+  num-threads - number of threads to serve the request.  Currently threads
+     are created when the server is started.  The default is 5.
+
+  max-backlog - max number of request queued when all threads are busy.
+     When a request comes while the queue is full, 503 (server busy)
+     response is returned to the client.   The default is 10.
+
+  access-log, error-log - specify the destination of logs.  #f (no log),
+     #t (stdout), string (filename) or <log-drain> object.
+     For access log, <log-drain> is better not to have prefix, for
+     timestamp is included in the message.  The default is #f.
+
+  forwarded? - specify #t if you use makiki behind a reverse-proxy httpd.
+     Then access-log uses the value of x-forwarded-for header if exists,
+     instead of the client's address.
+
+  app-data - a opaque data passed to the request handler as is.
+
+
+     
+
+
 
