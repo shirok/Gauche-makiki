@@ -25,16 +25,16 @@ calls `PROC` with two arguments.
 
     (define-record-type request  %make-request #t
       line                ; the first line of the request
-      socket              ; client socket
+      socket              ; client socket  (#<socket>)
       remote-addr         ; remote address (sockaddr)
-      method              ; request method
-      server-host         ; request host
-      server-port         ; request port
-      path                ; request path
+      method              ; request method (symbol in upper cases, e.g. GET)
+      server-host         ; request host (string)
+      server-port         ; request port (integer)
+      path                ; request path (string, url decoded)
       path-rxmatch        ; #<rxmatch> object of matched path
       query               ; unparsed query string
-      params              ; query parameters
-      headers             ; request headers
+      params              ; query parameters (result of cgi-parse-parameters)
+      headers             ; request headers (result of rfc822-read-headers)
       (response-error)    ; #f if response successfully sent, #<error> otherwise.
                           ;  set by respond/* procedures.  The handler can check
                           ;  this slot and take actions in case of an error.
