@@ -98,6 +98,9 @@ occurs during sending the message (most likely because the client
 has disconnected prematurely), an error condition is stored in
 (request-response-error REQ).
 
+Check out `sample-server` script in the source for some concrete examples
+of `define-http-handler`.
+
 
 # Build-in handlers
 
