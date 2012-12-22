@@ -6,6 +6,7 @@ At this moment, the only required file is `makiki.scm`, so you can
 either install it as an ordinary Gauche extension library, or you
 can just copy the file into your application.
 
+You need Gauche 0.9.3 or later to use Gauche-makiki.
 
 # Handling requests
 
