@@ -1,4 +1,6 @@
-# Overview
+# About Gauche-makiki
+
+## Overview
 
 Gauche-makiki is a simple multithreded http server intended for
 applications that want to provide http server capability easily.
@@ -8,7 +10,7 @@ can just copy the file into your application.
 
 You need Gauche 0.9.3 or later to use Gauche-makiki.
 
-# Handling requests
+## Handling requests
 
 To use the server, you should define _http-handler_ using
 `define-http-handler` macro:
@@ -102,9 +104,9 @@ Check out `sample-server` script in the source for some concrete examples
 of `define-http-handler`.
 
 
-# Build-in handlers
+## Build-in handlers
 
-## Serving files
+### Serving files
 
 For the convenience, file-handler can be used to create a handler
 procedure suitable for define-http-handler to return a file
@@ -119,7 +121,7 @@ slash, and the document-root directory passed to the start-http-server
 is prepended to it.  It is not allowed to go above the document
 root directory by `"/../../.."` etc---403 error message would results.
 
-## Modifying headers
+### Modifying headers
 
     (with-header-handler inner-handler header value ...)
 
@@ -137,8 +139,19 @@ that adds "Cache-control: public" header to the file response.
 Since that the headers are added before the inner handler is called,
 they may be overwritten by inner-handler.
 
+### Serving CGI script
 
-# Starting the server
+There's some rudimental support to call a CGI script written
+in Gauche.  Instead of spawning a child process, we load
+Gauche program and call its main routine "in process".
+
+The code hasn't been tested and probably won't work
+out-of-box.  If you're curious, check out the `cgi-script`
+procedure.  We might change the interface as we develop
+this feature more.
+
+
+## Starting the server
 
 Finally, to start the server, call `start-http-server`.
 
@@ -170,9 +183,3 @@ Finally, to start the server, call `start-http-server`.
        instead of the client's address.
 
     app-data - a opaque data passed to the request handler as is.
-
-
-     
-
-
-
