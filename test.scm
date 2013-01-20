@@ -30,7 +30,7 @@
     (test* "basic responds 404" "404"
            (values-ref (http-get *server* "/") 0))
 
-    (test* "bad request format" "HTTP/1.1 400 Bad Request"
+    (test* "bad request format" (eof-object)
            (let1 s (make-client-socket 'inet "localhost" *port*)
              (socket-shutdown s SHUT_WR)
              (unwind-protect (read-line (socket-input-port s))
