@@ -527,7 +527,7 @@
           [(killed) (error-log "[I] job killed: ~a" (job-result j))]
           [else (error-log "[I] unexpected job status: ~a" (job-status j))]))
       (loop))
-    (logger pool)))
+    (logger pool forwarded?)))
 
 (define (logtime time) (date->string (time-utc->date time) "~4"))
 
