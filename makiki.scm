@@ -636,7 +636,7 @@
    [#t `("REMOTE_HOST"  ,(request-remote-addr req))]
    ;; REMOTE_IDENT - not supported
    ;; REMOTE_USER - not supported
-   [#t `("REQUEST_METHOD" ,(request-method req))]
+   [#t `("REQUEST_METHOD" ,(x->string (request-method req)))]
    [#t `("SCRIPT_NAME" ,script-name)]
    [#t `("SERVER_NAME" ,(request-server-host req))]
    [#t `("SERVER_PORT" ,(request-server-port req))]
