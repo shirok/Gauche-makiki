@@ -556,14 +556,6 @@
 ;; with setting cgi metavariables and current i/o's. 
 ;; We don't support http authentications yet.
 (define (cgi-handler proc :key (script-name ""))
-  ;; NB: We should be able to get away from concatenating entire output---
-  ;; for future extension.
-  (define (uvector-concatenate uvs)
-    (let1 dest (make-u8vector (fold (^[v s] (+ (u8vector-length v) s)) 0 uvs))
-      (let loop ([pos 0] [uvs uvs])
-        (cond [(null? uvs) dest]
-              [else (u8vector-copy! dest pos (car uvs))
-                    (loop (+ pos (u8vector-length (car uvs))) (cdr uvs))]))))
   (define (header+content out)
     (let* ([p (open-input-string out)]
            [hdrs (rfc822-read-headers p)]
@@ -571,13 +563,13 @@
       (values hdrs body (string-size body))))
   (^[req app]
     (let1 out (open-output-string)
-      (with-input-from-port #?=(request-iport req)
+      (with-input-from-port (request-iport req)
         (^[]
           (let1 r (parameterize ([cgi-metavariables
                                   (get-cgi-metavariables req script-name)]
                                  [current-output-port
                                   (make <buffered-output-port>
-                                    :flush (^[v f] #?=(write-block v out)
+                                    :flush (^[v f] (write-block v out)
                                                    (u8vector-length v)))])
                     (unwind-protect (proc "")
                       (close-output-port (current-output-port))))
