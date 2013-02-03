@@ -48,24 +48,29 @@
               (socket-close s))))
    ))
 
-(test-section "cgi-handler")
+(test-section "cgi-handler and cgi-script")
 
-(call-with-server "tests/test-env1.scm"
-  (^p
-   (test* "empty parameters" (get-environment-variables)
-          (assq-ref (read-from-string (values-ref (http-get *server* "/") 2))
-                    'environments)
-          (cut lset= equal? <> <>))          
-   (test* "with parameters" '(("a" ")(!#%%$!*^({}<>" "wat?") ("b" ""))
-          (assq-ref (read-from-string
-                     (values-ref (http-get *server* '("/"
-                                                      (a ")(!#%%$!*^({}<>")
-                                                      (b "")
-                                                      (a "wat?")))
-                                 2))
-                    'parameters)
-          (cut lset= equal? <> <>))
-   ))
+(define (test-cgi-stuff server-file)
+  (call-with-server server-file
+   (^p
+    (test* #`"(,server-file) empty parameters" (get-environment-variables)
+           (assq-ref (read-from-string (values-ref (http-get *server* "/") 2))
+                     'environments)
+           (cut lset= equal? <> <>))          
+    (test* #`"(,server-file )with parameters"
+           '(("a" ")(!#%%$!*^({}<>" "wat?") ("b" ""))
+           (assq-ref (read-from-string
+                      (values-ref (http-get *server* '("/"
+                                                       (a ")(!#%%$!*^({}<>")
+                                                       (b "")
+                                                       (a "wat?")))
+                                  2))
+                     'parameters)
+           (cut lset= equal? <> <>))
+    )))
+
+(test-cgi-stuff "tests/test-env1.scm")
+(test-cgi-stuff "tests/test-env2.scm")
 
 ;; epilogue
 (test-end)
