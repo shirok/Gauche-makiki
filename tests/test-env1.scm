@@ -1,12 +1,14 @@
 (use makiki)
 (use gauche.parseopt)
 
-(load "env.scm")
+(load "tests/env.scm")
 (define env-main main)
 
 (define (main args)
   (let-args (cdr args) ([p "port=i"])
-    (start-http-server :access-log #t :error-log #t :port p))
+    (start-http-server :access-log #t ;; required to make handshake work
+                       :error-log "test-error.log"
+                       :port p))
   0)
 
 (define-http-handler #/^\/$/

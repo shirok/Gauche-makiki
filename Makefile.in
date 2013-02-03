@@ -43,7 +43,7 @@ makiki_SRCS =
 all : $(TARGET) makiki.scm
 
 check : all
-	@rm -f test.log
+	@rm -f test*.log
 	$(GOSH) -I. -I$(srcdir) $(srcdir)/test.scm > test.log
 
 install : all
@@ -60,7 +60,7 @@ uninstall :
 
 clean :
 	$(GAUCHE_PACKAGE) compile --clean makiki $(makiki_SRCS)
-	rm -rf core $(TARGET) $(GENERATED) *~ test.log so_locations
+	rm -rf core $(TARGET) $(GENERATED) *~ test*.log so_locations
 
 distclean : clean
 	rm -rf $(CONFIG_GENERATED)

@@ -564,29 +564,26 @@
         (cond [(null? uvs) dest]
               [else (u8vector-copy! dest pos (car uvs))
                     (loop (+ pos (u8vector-length (car uvs))) (cdr uvs))]))))
-  (define (header+content vec)
-    (let* ([p (open-input-uvector vec)]
+  (define (header+content out)
+    (let* ([p (open-input-string out)]
            [hdrs (rfc822-read-headers p)]
-           [pos (port-tell p)])
-      (values hdrs
-              (uvector-alias <u8vector> vec pos)
-              (- (u8vector-length vec) pos))))
+           [body (get-remaining-input-string p)])
+      (values hdrs body (string-size body))))
   (^[req app]
-    (let1 q (make-queue)
-      (with-input-from-port (request-iport req)
+    (let1 out (open-output-string)
+      (with-input-from-port #?=(request-iport req)
         (^[]
           (let1 r (parameterize ([cgi-metavariables
                                   (get-cgi-metavariables req script-name)]
                                  [current-output-port
                                   (make <buffered-output-port>
-                                    :flush (^[v f]
-                                             (enqueue! q (u8vector-copy v))
-                                             (u8vector-length v)))])
+                                    :flush (^[v f] #?=(write-block v out)
+                                                   (u8vector-length v)))])
                     (unwind-protect (proc "")
                       (close-output-port (current-output-port))))
             (if (zero? r)
               (receive (hdrs content content-length)
-                  (header+content (uvector-concatenate (dequeue-all! q)))
+                  (header+content (get-output-string out))
                 (dolist [h hdrs] (response-header-push! req (car h) (cadr h)))
                 (respond/ok req content
                             :content-type
