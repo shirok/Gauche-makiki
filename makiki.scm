@@ -579,8 +579,9 @@
                                   (get-cgi-metavariables req script-name)]
                                  [current-output-port
                                   (make <buffered-output-port>
-                                    :flush (^[v f] (enqueue! q v)
-                                                   (u8vector-length v)))])
+                                    :flush (^[v f]
+                                             (enqueue! q (u8vector-copy v))
+                                             (u8vector-length v)))])
                     (unwind-protect (proc "")
                       (close-output-port (current-output-port))))
             (if (zero? r)
