@@ -556,11 +556,6 @@
 ;; with setting cgi metavariables and current i/o's. 
 ;; We don't support http authentications yet.
 (define (cgi-handler proc :key (script-name ""))
-  (define (header+content out)
-    (let* ([p (open-input-string out)]
-           [hdrs (rfc822-read-headers p)]
-           [body (get-remaining-input-string p)])
-      (values hdrs body (string-size body))))
   (^[req app]
     (let1 out (open-output-string)
       (with-input-from-port (request-iport req)
@@ -574,10 +569,10 @@
                     (unwind-protect (proc "")
                       (close-output-port (current-output-port))))
             (if (zero? r)
-              (receive (hdrs content content-length)
-                  (header+content (get-output-string out))
+              (let* ([p    (open-input-string (get-output-string out))]
+                     [hdrs (rfc822-read-headers p)])
                 (dolist [h hdrs] (response-header-push! req (car h) (cadr h)))
-                (respond/ok req content
+                (respond/ok req (get-remaining-input-string p)
                             :content-type
                             (rfc822-header-ref hdrs "content-type")))
               (respond/ng req 500))))))))
