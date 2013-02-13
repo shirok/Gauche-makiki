@@ -104,7 +104,7 @@ Check out `sample-server` script in the source for some concrete examples
 of `define-http-handler`.
 
 
-## Build-in handlers
+## Built-in handlers
 
 ### Serving files
 
