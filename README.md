@@ -121,6 +121,14 @@ slash, and the document-root directory passed to the start-http-server
 is prepended to it.  It is not allowed to go above the document
 root directory by `"/../../.."` etc---403 error message would results.
 
+Makiki uses some heuristics to determine `content-type` of the file,
+but that's far from complete.   You can use a parameter `file-mime-type`
+to customize the association of content-type and files; it must be a
+procedure that takes one argument, the pathname of the file, and it
+must return a mime-type in string, or `#f` to delegate the association
+to the makiki's default handler.
+
+
 ### Modifying headers
 
     (with-header-handler inner-handler header value ...)

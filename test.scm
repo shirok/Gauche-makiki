@@ -6,6 +6,8 @@
 (use gauche.process)
 (use gauche.net)
 (use rfc.http)
+(use rfc.822)
+(use file.util)
 (use srfi-1)
 (use srfi-98)
 
@@ -46,6 +48,23 @@
                   (socket-shutdown s SHUT_WR)
                   (read-line (socket-input-port s)))
               (socket-close s))))
+   ))
+
+(test-section "file-handler")
+
+(call-with-server "tests/file.scm"
+  (^p
+   (define (file-test path ctype)
+     (receive (code hdrs body) (http-get *server* #`"/,path")
+       (test* (format "file test ~s" path) `("200" ,ctype #t)
+              (list code (rfc822-header-ref hdrs "content-type")
+                    (equal? (file->string path) body)))))
+   (file-test "tests/file.scm" "text/plain")
+   (file-test "tests/file-dummy.js" "application/javascript; charset=utf-8")
+   (file-test "tests/file-dummy.gif" "image/gif")
+   (file-test "tests/file-dummy.jpg" "image/jpeg")
+   (file-test "tests/file-dummy.png" "image/png")
+   (file-test "tests/file-dummy.css" "text/css")
    ))
 
 (test-section "cgi-handler and cgi-script")

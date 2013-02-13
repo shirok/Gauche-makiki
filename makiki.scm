@@ -1,5 +1,5 @@
 ;;;
-;;;   Copyright (c) 2010-2011 Shiro Kawai  <shiro@acm.org>
+;;;   Copyright (c) 2010-2013 Shiro Kawai  <shiro@acm.org>
 ;;;
 ;;;   Redistribution and use in source and binary forms, with or without
 ;;;   modification, are permitted provided that the following conditions
@@ -71,7 +71,7 @@
           response-header-replace!
           response-cookie-add! response-cookie-delete!
           define-http-handler add-http-handler!
-          file-handler cgi-handler cgi-script
+          file-handler file-mime-type cgi-handler cgi-script
           with-header-handler)
   )
 (select-module makiki)
@@ -83,6 +83,8 @@
 (define docroot (make-parameter "."))
 
 (define http-server-software (make-parameter "gauche/makiki"))
+
+(define file-mime-type (make-parameter (^[path] #f)))
 
 ;;;
 ;;; Logging
@@ -297,7 +299,7 @@
 ;; API
 ;; returns Request
 (define (respond/ok req body :key (keepalive #f) (content-type #f))
-  (define (resp ctype body) (%respond req 200 (or content-type ctype) body))
+  (define (resp ctype body) (%respond req 200 ctype body))
   (define has-body? (not (eq? (request-method req) 'HEAD)))
   (unwind-protect
       (guard (e [else (error-log "respond/ok error ~s" (~ e'message))
@@ -306,15 +308,9 @@
           [(? string?) (resp "text/html; charset=utf-8" body)]
           [(? u8vector?) (resp "application/binary" body)]
           [('file filename)
-           (let ([ctype (rxmatch-case filename
-                          [#/\.js$/ () "application/javascript; charset=utf-8"]
-                          [#/\.png$/ () "image/png"]
-                          [#/\.(jpg|jpeg)$/ () "image/jpeg"]
-                          [#/\.css$/ () "text/css"]
-                          [#/\.(mpg|mpeg)$/ () "video/mpeg"]
-                          [#/\.wav$/ () "audio/wav"]
-                          [#/\.(html|htm)$/ () "text/html; charset=utf-8"]
-                          [else "text/plain"])] ;ideally use file magic
+           (let ([ctype (or content-type
+                            ((file-mime-type) filename)
+                            (default-file-mime-type filename))]
                  [content (%fetch-file-content filename has-body?)])
              (if content
                (resp ctype content)
@@ -677,6 +673,24 @@
   (html:li
    (html:a :href (build-path rpath name)
            (html-escape-string (string-append name suffix)))))
+
+;; Built-in mime-type recognizer.
+;; Applications can augument this by binding the file-mime-type parameter.
+;; NB: Ideally we should try file magic instead of relying the suffix.
+(define (default-file-mime-type path)
+  (rxmatch-case path
+    [#/\.js$/ () "application/javascript; charset=utf-8"]
+    [#/\.png$/ () "image/png"]
+    [#/\.(jpg|jpeg)$/ () "image/jpeg"]
+    [#/\.gif$/ () "image/gif"]
+    [#/\.css$/ () "text/css"]
+    [#/\.(mpg|mpeg)$/ () "video/mpeg"]
+    [#/\.(wm[xv]?)$/ (_ m) #`"video/x-ms-,m"]
+    [#/\.(wm[zd])$/ (_ m) #`"application/x-ms-,m"]
+    [#/\.(wma)$/ (_ m) #`"audio/x-ms-,m"]
+    [#/\.wav$/ () "audio/wav"]
+    [#/\.(html|htm)$/ () "text/html; charset=utf-8"]
+    [else "text/plain"])) ; fallback
 
 ;;;
 ;;; Adds header
