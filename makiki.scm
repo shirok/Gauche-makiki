@@ -685,6 +685,7 @@
     [#/\.gif$/ () "image/gif"]
     [#/\.css$/ () "text/css"]
     [#/\.(mpg|mpeg)$/ () "video/mpeg"]
+    [#/\.(mp4)$/ () "video/mp4"]
     [#/\.(wm[xv]?)$/ (_ m) #`"video/x-ms-,m"]
     [#/\.(wm[zd])$/ (_ m) #`"application/x-ms-,m"]
     [#/\.(wma)$/ (_ m) #`"audio/x-ms-,m"]
