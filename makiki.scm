@@ -562,7 +562,7 @@
                                   (make <buffered-output-port>
                                     :flush (^[v f] (write-block v out)
                                                    (u8vector-length v)))])
-                    (unwind-protect (proc "")
+                    (unwind-protect (proc `(,script-name))
                       (close-output-port (current-output-port))))
             (if (zero? r)
               (let* ([p    (open-input-string (get-output-string out))]

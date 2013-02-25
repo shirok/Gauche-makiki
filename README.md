@@ -17,6 +17,10 @@ To use the server, you should define _http-handler_ using
 
     (define-http-handler REGEXP PROC)
 
+Or, handlers can be added procedurally using `add-http-handler`:
+
+    (add-http-handler! REGEXP PROC)
+
 For each incoming request, the server matches its path of
 the request uri against `REGEXP`, and if it matches, the server
 calls `PROC` with two arguments.
@@ -129,6 +133,49 @@ must return a mime-type in string, or `#f` to delegate the association
 to the makiki's default handler.
 
 
+### Serving CGI script
+
+There's an experimental support to call a CGI script written
+in Gauche.  Instead of spawning a child process, we load
+Gauche program and call its main routine "in process".
+
+    (cgi-script FILE :key ENTRY-POINT SCRIPT-NAME LOAD-EVERY-TIME)
+
+Loads the cgi script in FILE, and creates and returns a cgi handler that
+calls a procedure named by ENTRY-POINT inside the script (`main` by default).
+
+To avoid interference with makiki itself, the script is loaded
+into an anonymous module.  
+
+Loading is done only once unless LOAD-EVERY-TIME is true.
+Usually, loading only once cuts the overhead of script loading for
+repeating requests.  However, if the cgi script sets some global
+state, it should be loaded for every request---a script can
+be executed concurrently, so any code relying on a shared mutable
+global state will fail.
+Note also that we assume the script itself isn't written inside
+a specific module; if it has it's own define-module and
+select-module, the module will be shared for every load, and
+we won't have enough isolation.
+
+The cgi script should access to cgi metavariables through
+`cgi-get-metavariable` (in `www.cgi` module), not directly
+from the environment variables.
+
+SCRIPT-NAME is used to set the `SCRIPT-NAME` CGI metavariable.
+
+    (cgi-handler PROC :key SCRIPT-NAME)
+
+This is the low-level procedure that creates an http handler that
+sets up the cgi metavariables and calls PROC, that takes one
+argument (as in `main` procedure of the usual script; though
+most cgi scripts won't use the argument).
+
+PROC would write out the response to its stdout; which will
+be captured by the created handler and returned to the client.
+
+
+
 ### Modifying headers
 
     (with-header-handler inner-handler header value ...)
@@ -147,16 +194,18 @@ that adds "Cache-control: public" header to the file response.
 Since that the headers are added before the inner handler is called,
 they may be overwritten by inner-handler.
 
-### Serving CGI script
 
-There's some rudimental support to call a CGI script written
-in Gauche.  Instead of spawning a child process, we load
-Gauche program and call its main routine "in process".
+### Logging
 
-The code hasn't been tested and probably won't work
-out-of-box.  If you're curious, check out the `cgi-script`
-procedure.  We might change the interface as we develop
-this feature more.
+If you write out logs inside an http handler, you can use those
+macros:
+
+    (access-log FMT ARGS ...)
+    (error-log FMT ARGS ...)
+
+FMT and ARGS are the same as `log-format` in `gauche.logger`.
+The destination of logs are set by the keyword arguments
+of `start-http-server` described below.
 
 
 ## Starting the server
@@ -191,3 +240,8 @@ Finally, to start the server, call `start-http-server`.
        instead of the client's address.
 
     app-data - a opaque data passed to the request handler as is.
+
+
+## Examples
+
+For examples, see `sample-server` and the files in the `tests` directory.
