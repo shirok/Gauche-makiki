@@ -508,7 +508,8 @@
           [(done) (let1 r (job-result j)
                     (unless (request? r)
                       (error "some handler didn't return request:" r))
-                    (access-log "~a: ~a \"~a\" ~a ~a ~s ~a"
+                    ;; NB: This should be customizable!
+                    (access-log "~a: ~a ~s ~a ~a ~s ~s ~a"
                                 (logtime (job-acknowledge-time j))
                                 (or (and forwarded?
                                          (request-header-ref r "x-forwarded-for"))
@@ -517,6 +518,8 @@
                                 (request-status r)
                                 (request-response-size r)
                                 (logreferer r)
+                                (rfc822-header-ref (request-headers r)
+                                                   "user-agent" #f)
                                 (logdt (job-acknowledge-time j)
                                        (job-finish-time j))))]
           [(error) (error-log "[I] job error: ~a" (~ (job-result j)'message))]
