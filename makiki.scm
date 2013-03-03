@@ -71,6 +71,7 @@
           response-header-replace!
           response-cookie-add! response-cookie-delete!
           define-http-handler add-http-handler!
+          document-root
           file-handler file-mime-type cgi-handler cgi-script
           with-header-handler)
   )
@@ -80,7 +81,7 @@
 ;;; Some parameters
 ;;;
 
-(define docroot (make-parameter "."))
+(define document-root (make-parameter "."))
 
 (define http-server-software (make-parameter "gauche/makiki"))
 
@@ -417,7 +418,7 @@
 ;; API
 (define (start-http-server :key (host #f)
                                 (port 8080)
-                                (document-root ".")
+                                ((:document-root docroot) ".")
                                 (num-threads 5)
                                 (max-backlog 10)
                                 ((:access-log alog) #f)
@@ -427,7 +428,7 @@
   ;; see initial-log-drain for the possible values of access-log and error-log.
   (parameterize ([access-log-drain (initial-log-drain alog 'access-log)]
                  [error-log-drain (initial-log-drain elog 'error-log)]
-                 [docroot document-root])
+                 [document-root docroot])
     (let* ([pool (tpool:make-thread-pool num-threads :max-backlog max-backlog)]
            [tlog (kick-logger-thread pool forwarded?)]
            [ssocks (make-server-sockets host port :reuse-addr? #t)])
@@ -614,7 +615,7 @@
    [#t `("GATEWAY_INTERFACE" "CGI/1.1")]
    [#t `("PATH_INFO" ,(request-path req))]
    [#t `("PATH_TRANSLATED" ;todo - flexible path trans.
-         ,(string-append (docroot) (request-path req)))]
+         ,(string-append (document-root) (request-path req)))]
    [#t `("QUERY_STRING" ,(request-query req))]
    [#t `("REMOTE_ADDR" ,(logip (request-remote-addr req)))]
    [#t `("REMOTE_HOST"  ,(request-remote-addr req))]
@@ -642,7 +643,7 @@
     (if (or (string-prefix? "/../" rpath)
             (string=? "/.." rpath))
       (respond/ng req 403)      ;do not allow path traversal
-      (let1 fpath (sys-normalize-pathname #`",(docroot),rpath")
+      (let1 fpath (sys-normalize-pathname #`",(document-root),rpath")
         (cond [(file-is-readable? fpath)
                (if (file-is-directory? fpath)
                  (%handle-directory req fpath rpath dirindex)

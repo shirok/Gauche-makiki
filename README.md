@@ -132,6 +132,11 @@ procedure that takes one argument, the pathname of the file, and it
 must return a mime-type in string, or `#f` to delegate the association
 to the makiki's default handler.
 
+    (docuement-root)
+
+A parameter that holds the current path of the document root (the one
+given to `start-http-server`; `"."` by default.)
+
 
 ### Serving CGI script
 
