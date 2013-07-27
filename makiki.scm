@@ -572,7 +572,6 @@
                                   (make <buffered-output-port>
                                     :flush (^[v f] (write-block v out)
                                                    (u8vector-length v)))])
-                    (access-log "~s" (cgi-metavariables))
                     (unwind-protect (proc `(,script-name))
                       (close-output-port (current-output-port))))
             (if (zero? r)
