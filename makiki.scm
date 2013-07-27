@@ -555,6 +555,12 @@
 ;; This can be used to call a cgi program's main procedure PROC,
 ;; with setting cgi metavariables and current i/o's. 
 ;; We don't support http authentications yet.
+;;
+;; SCRIPT-NAME should be an absolute path of the script that appear in
+;; URL.  That is, if you want to make the script invoked as
+;; http://example.com/foo/bar/baz.cgi, give "/foo/bar/baz.cgi".
+;; It is necessary to calculate PATH_INFO properly.
+
 (define (cgi-handler proc :key (script-name ""))
   (^[req app]
     (let1 out (open-output-string)
@@ -566,21 +572,28 @@
                                   (make <buffered-output-port>
                                     :flush (^[v f] (write-block v out)
                                                    (u8vector-length v)))])
+                    (access-log "~s" (cgi-metavariables))
                     (unwind-protect (proc `(,script-name))
                       (close-output-port (current-output-port))))
             (if (zero? r)
               (let* ([p    (open-input-string (get-output-string out))]
                      [hdrs (rfc822-read-headers p)])
                 (dolist [h hdrs] (response-header-push! req (car h) (cadr h)))
-                (respond/ok req (get-remaining-input-string p)
-                            :content-type
-                            (rfc822-header-ref hdrs "content-type")))
+                (if-let1 location (rfc822-header-ref hdrs "location")
+                  (respond/redirect req location)
+                  (respond/ok req (get-remaining-input-string p)
+                              :content-type
+                              (rfc822-header-ref hdrs "content-type"))))
               (respond/ng req 500))))))))
 
 ;; Load file as a cgi script, and create a cgi handler that calls a
 ;; procedure named by ENTRY-POINT inside the script.
 ;; To avoid interference with makiki itself, the script is loaded
 ;; into an anonymous module.
+;;
+;; See cgi-handler above for SCRIPT-NAME.  It's NOT the pathname to
+;; the cgi script file.
+;;
 ;; Loading is done only once unless LOAD-EVERY-TIME is true.
 ;; Usually, loading only once cuts the overhead of script loading for
 ;; repeating requests.  However, if the cgi script sets some global
@@ -613,7 +626,11 @@
    [(request-header-ref req "content-type")
     => (^v (list "CONTENT_LENGTH" (x->string v)))]
    [#t `("GATEWAY_INTERFACE" "CGI/1.1")]
-   [#t `("PATH_INFO" ,(request-path req))]
+   [#t `("PATH_INFO"
+         ,(if (string-prefix? script-name (request-path req))
+            (string-drop (request-path req)
+                         (string-prefix-length script-name (request-path req)))
+            (request-path req)))] ; not correct, but don't know what to do.
    [#t `("PATH_TRANSLATED" ;todo - flexible path trans.
          ,(string-append (document-root) (request-path req)))]
    [#t `("QUERY_STRING" ,(request-query req))]

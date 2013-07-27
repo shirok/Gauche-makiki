@@ -167,7 +167,12 @@ The cgi script should access to cgi metavariables through
 `cgi-get-metavariable` (in `www.cgi` module), not directly
 from the environment variables.
 
-SCRIPT-NAME is used to set the `SCRIPT-NAME` CGI metavariable.
+SCRIPT-NAME is the path to the script *in the URL*.  That is,
+if the script is accessible via `http://example.com/foo/bar/baz.cgi`,
+then it should be `"/foo/bar/baz.cgi"`.  It isn't related to
+the actual pathname of the cgi script file.  The value becomes
+the value of `SCRIPT_NAME` CGI metavariable, and also used to
+calculate `PATH_INFO` CGI metavariable.
 
     (cgi-handler PROC :key SCRIPT-NAME)
 
