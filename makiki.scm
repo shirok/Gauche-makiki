@@ -92,16 +92,31 @@
 ;;;
 
 (define access-log-drain (make-parameter #f))
-(define error-log-drain (make-parameter #f))
+(define error-log-drain  (make-parameter #f))
 
-(define-macro (define-log-macro name drain-param)
-  `(define-macro (,name fmt . args)
-     (let1 drain (gensym)
-       `(if-let1 ,drain (,,drain-param)
-          (log-format ,drain ,fmt ,@args)))))
+;; NB: For access log, we want to use job-acknowledged-time for timestamp.
+;; So we don't use :prefix feature of log-drain.  For public API, we attach
+;; timestamp to format string.
 
-(define-log-macro access-log access-log-drain)
-(define-log-macro error-log error-log-drain)
+;; NB: We make them macro, so that args won't be evaluated when unnecessary.
+(define-syntax access-log
+  (syntax-rules ()
+    [(_ fmt args ...)
+     (if-let1 drain (access-log-drain)
+       (log-format drain (string-append "~a: " fmt)
+                   (logtime (current-time)) args ...))]))
+
+(define-syntax access-log-sans-ts  ; for internal use
+  (syntax-rules ()
+    [(_ fmt args ...)
+     (if-let1 drain (access-log-drain)
+       (log-format drain fmt args ...))]))
+
+(define-syntax error-log
+  (syntax-rules ()
+    [(_ fmt args ...)
+     (if-let1 drain (error-log-drain)
+       (log-format drain fmt args ...))]))
 
 ;;;
 ;;; Request packet
@@ -442,10 +457,10 @@
                                (accept-client app-data (socket-accept s) pool))
                              '(r)))
             (when startup-callback (startup-callback ssocks))
-            (access-log "~a: started on ~a" (logtime (current-time))
+            (access-log "started on ~a"
                         (map (.$ sockaddr-name socket-address) ssocks))
             (while #t (selector-select sel)))
-        (access-log "~a: terminating" (logtime (current-time)))
+        (access-log "terminating")
         (for-each socket-close ssocks)
         (tpool:terminate-all! pool :force-timeout 300)
         (thread-terminate! tlog)
@@ -514,19 +529,19 @@
                     (unless (request? r)
                       (error "some handler didn't return request:" r))
                     ;; NB: This should be customizable!
-                    (access-log "~a: ~a ~s ~a ~a ~s ~s ~a"
-                                (logtime (job-acknowledge-time j))
-                                (or (and forwarded?
-                                         (request-header-ref r "x-forwarded-for"))
-                                    (logip (request-remote-addr r)))
-                                (request-line r)
-                                (request-status r)
-                                (request-response-size r)
-                                (logreferer r)
-                                (rfc822-header-ref (request-headers r)
-                                                   "user-agent" #f)
-                                (logdt (job-acknowledge-time j)
-                                       (job-finish-time j))))]
+                    ($ access-log-sans-ts "~a: ~a ~s ~a ~a ~s ~s ~a"
+                       (logtime (job-acknowledge-time j))
+                       (or (and forwarded?
+                                (request-header-ref r "x-forwarded-for"))
+                           (logip (request-remote-addr r)))
+                       (request-line r)
+                       (request-status r)
+                       (request-response-size r)
+                       (logreferer r)
+                       (rfc822-header-ref (request-headers r)
+                                          "user-agent" #f)
+                       (logdt (job-acknowledge-time j)
+                              (job-finish-time j))))]
           [(error) (error-log "[I] job error: ~a" (~ (job-result j)'message))]
           [(killed) (error-log "[I] job killed: ~a" (job-result j))]
           [else (error-log "[I] unexpected job status: ~a" (job-status j))]))
