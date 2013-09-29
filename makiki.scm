@@ -424,7 +424,9 @@
                                 ((:access-log alog) #f)
                                 ((:error-log elog) #f)
                                 (forwarded? #f)
-                                (app-data #f))
+                                (app-data #f)
+                                (startup-callback #f)
+                                (shutdown-callback #f))
   ;; see initial-log-drain for the possible values of access-log and error-log.
   (parameterize ([access-log-drain (initial-log-drain alog 'access-log)]
                  [error-log-drain (initial-log-drain elog 'error-log)]
@@ -439,13 +441,15 @@
                              (^[fd condition]
                                (accept-client app-data (socket-accept s) pool))
                              '(r)))
+            (when startup-callback (startup-callback ssocks))
             (access-log "~a: started on ~a" (logtime (current-time))
                         (map (.$ sockaddr-name socket-address) ssocks))
             (while #t (selector-select sel)))
         (access-log "~a: terminating" (logtime (current-time)))
         (for-each socket-close ssocks)
         (tpool:terminate-all! pool :force-timeout 300)
-        (thread-terminate! tlog)))))
+        (thread-terminate! tlog)
+        (when shutdown-callback (shutdown-callback))))))
 
 (define (kick-logger-thread pool forwarded?)
   (thread-start! (make-thread (cut logger pool forwarded?))))
