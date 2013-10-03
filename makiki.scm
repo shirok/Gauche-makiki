@@ -334,7 +334,7 @@
           [('plain obj) (resp "text/plain; charset=utf-8"
                               (write-to-string obj display))]
           [('json alist)(resp "application/json; charset=utf-8"
-                              (alist->json alist))]
+                              (construct-json-string alist))]
           [('sxml node) (resp "text/html; charset=utf-8"
                               (tree->string (sxml:sxml->html node)))]
           [('chunks . chunks)
@@ -351,23 +351,6 @@
           [else (resp "text/html; charset=utf-8" (tree->string body))])
         req)
     (unless keepalive (socket-close (request-socket req)))))
-
-;; NB: We can't use rfc.json due to the bug exists until Gauche-0.9.2.
-;; After releasing 0.9.3, discard these and replace the call of alist->json
-;; to compose-json-string.
-(define (alist->json alist)
-  (tree->string
-   `("{",($ intersperse ","
-            $ map (^p `(,(write-to-string (x->string (car p)))
-                        ":",(item->json (cdr p))))
-                  alist)
-     "}")))
-
-(define (item->json item)
-  (match item
-    [#(elt ...)    `("[" ,@(intersperse "," (map item->json elt)) "]")]
-    [((x . y) . _) (alist->json item)]
-    [_ (write-to-string item)]))
 
 ;; Returns file contents as a lazy list of chunks, or #f
 ;; if we can't read the file.
