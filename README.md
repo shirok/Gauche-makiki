@@ -37,7 +37,7 @@ calls `PROC` with two arguments.
       server-host         ; request host (string)
       server-port         ; request port (integer)
       path                ; request path (string, url decoded)
-      path-rxmatch        ; #<rxmatch> object of matched path
+      path-rxmatch        ; #<regmatch> object of matched path
       query               ; unparsed query string
       params              ; query parameters (result of cgi-parse-parameters)
       headers             ; request headers (result of rfc822-read-headers)
