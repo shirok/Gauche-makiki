@@ -63,7 +63,8 @@
           request-socket request-iport request-oport request-method
           request-server-host request-server-port
           request-path request-path-rxmatch
-          request-params request-response-error
+          request-response-error
+          request-params  request-param-ref
           request-headers request-header-ref
           request-cookies request-cookie-ref
           respond/ng respond/ok respond/redirect
@@ -169,6 +170,10 @@
 (define-inline (request-oport req) (socket-output-port (request-socket req)))
 
 ;; some convenience accessors
+;; API
+(define (request-param-ref req param-name . keys)
+  (apply cgi-get-parameter param-name (request-params req) keys))
+
 ;; API
 (define (request-header-ref req header-name :optional (default #f))
   (rfc822-header-ref (request-headers req) header-name default))

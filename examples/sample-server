@@ -5,12 +5,11 @@
 ;; top source directory of Gauche-makiki.
 ;;
 
-(add-load-path "." :relative)
+(add-load-path ".." :relative)
 (use gauche.threads)
 (use gauche.parseopt)
 (use text.html-lite)
 (use srfi-1)
-(use www.cgi)
 (use makiki)
 
 ;; main program just starts the server.
@@ -69,8 +68,8 @@
 
 (define-http-handler #/\/wall$/
   (^[req app]
-    (let ([name (cgi-get-parameter "name" (request-params req))]
-          [message (cgi-get-parameter "message" (request-params req))])
+    (let ([name (request-param-ref req "name")]
+          [message (request-param-ref req "message")])
       (when (and name message)
         (atomic-update! *wall* (cut cons `(,name ,(sys-time) ,message) <>)))
       (respond/ok req (atomic *wall* render-wall)))))

@@ -57,6 +57,11 @@ The following convenience procedures are avaiable on the request record.
                             ;  to this port normally---one of the 
                             ;  'respond' procedures below takes care of
                             ;  writing response line and headers.
+
+    (request-param-ref REQ PARAM-NAME . keys)
+                            ; Retrive request query-string parameter with
+                            ; PARAM-NAME.  KEYS are a keyward-value list
+                            ; passed to cgi-get-parameter in www.cgi.
     (request-header-ref REQ HEADER-NAME :optional (DEFAULT #f))
                             ; retrieve the value from the request headers.
     (request-cookies REQ)   ; returns parsed cookie list (see rfc.cookie)
