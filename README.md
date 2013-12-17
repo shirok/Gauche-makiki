@@ -104,8 +104,8 @@ occurs during sending the message (most likely because the client
 has disconnected prematurely), an error condition is stored in
 (request-response-error REQ).
 
-Check out `sample-server` script in the source for some concrete examples
-of `define-http-handler`.
+Check out `examples/sample-server` script in the source for some
+concrete examples of `define-http-handler`.
 
 
 ## Built-in handlers
@@ -138,7 +138,7 @@ A parameter that holds the current path of the document root (the one
 given to `start-http-server`; `"."` by default.)
 
 
-### Serving CGI script
+### Serving contents by CGI scripts
 
 There's an experimental support to call a CGI script written
 in Gauche.  Instead of spawning a child process, we load
