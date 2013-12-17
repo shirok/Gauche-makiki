@@ -60,41 +60,6 @@
                              (map (^p (map (^v #`",(car p): ,v\n") (cdr p)))
                                   (request-headers req))))))))
 
-
-;; The '/wall' shows simple form handling.
-;; Here consider only GET parameters.
-
-(define *wall* (atom '()))  ;; ((name timestamp message) ...)
-
-(define-http-handler #/\/wall$/
-  (^[req app]
-    (let ([name (request-param-ref req "name")]
-          [message (request-param-ref req "message")])
-      (when (and name message)
-        (atomic-update! *wall* (cut cons `(,name ,(sys-time) ,message) <>)))
-      (respond/ok req (atomic *wall* render-wall)))))
-
-(define (render-wall msgs)
-  (define (render-entry name timestamp message)
-    `((dt (b ,name) " "
-          "(",(sys-strftime "%Y/%m/%d %H:%M:%S" (sys-localtime timestamp))")")
-      (dd ,message)))
-  `(sxml
-    (html
-     (head (title "wall"))
-     (body
-      (form (@ (method "GET") (action "/wall"))
-            (table (tr (th "Name:")
-                       (td (input (@ (type "text") (name "name")))))
-                   (tr (th "Message:")
-                       (td (textarea (@ (name "message") (cols 60)) "")))
-                   (tr (td)
-                       (td (input (@ (type "submit") (name "s") (value "Write")))))))
-      (dl ,@(append-map (pa$ apply render-entry) msgs))))))
-
-
-        
-
 ;; Local variables:
 ;; mode: scheme
 ;; end:
