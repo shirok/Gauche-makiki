@@ -114,6 +114,19 @@ Check out scripts in `examples` directory for some concrete examples.
 
 ## Built-in handlers
 
+For typical tasks, we provide convenience procedures to build a
+suitable handler.  The following procedures return a procedure
+that can be directly passed to `define-http-handler`; for example,
+the following handler definition serves files under `document-root`:
+
+    (define-http-handler #/^\/  (file-handler))
+
+Some handler-builders takes another handler procedure and returns
+a new handler that auguments the original handler.  
+
+See [examples](examples/) for more usages.
+
+
 ### Serving files
 
 For the convenience, file-handler can be used to create a handler
@@ -142,7 +155,7 @@ A parameter that holds the current path of the document root (the one
 given to `start-http-server`; `"."` by default.)
 
 
-### Serving contents by CGI scripts
+### Calling CGI scripts
 
 There's an experimental support to call a CGI script written
 in Gauche.  Instead of spawning a child process, we load
@@ -209,7 +222,30 @@ Since that the headers are added before the inner handler is called,
 they may be overwritten by inner-handler.
 
 
-### Logging
+### Handling POST request parameters
+
+A query string in a request url is automatically parsed and
+accessible via `request-query`, `request-params` and `request-param-ref`,
+but the parameters passed via POST body aren't processed by default.
+
+The following procedure returns a handler that parses POST request body
+and put the parsed result to `request-params`:
+
+   (with-post-parameters INNER-HANDLER :key PART-HANDLERS)
+
+The REQUEST structure the INNER-HANDLER receives got parsed parameters
+(If the original request also has a query string in url, that will be
+overwritten.)
+
+PART-HANDLERS specifies how to handle each parameter is handled
+according to its name.  By default, all parameter values are
+read into strings.  However, you might not want that behavior if
+you're accepting large file updates.  See the documentation of
+[`www.cgi` module](http://practical-scheme.net/gauche/man/?p=www.cgi)
+for the meaning of PART-HANDLERS.
+
+
+## Logging
 
 If you write out logs inside an http handler, you can use those
 macros:
@@ -267,4 +303,6 @@ Finally, to start the server, call `start-http-server`.
 
 ## Examples
 
-For examples, see `sample-server` and the files in the `tests` directory.
+The [examples](examples/) directory contains sompe simple server scripts,
+each one shows how to implement a specific fuctionality.
+

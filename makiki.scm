@@ -74,7 +74,7 @@
           define-http-handler add-http-handler!
           document-root
           file-handler file-mime-type cgi-handler cgi-script
-          with-header-handler)
+          with-header-handler with-post-parameters)
   )
 (select-module makiki)
 
@@ -162,6 +162,15 @@
 (define-inline (make-ng-request msg socket)
   (%make-request msg socket (socket-getpeername socket)
                  "" "" 80 "" #f "" '() '() #f '() '() #f '() 0))
+
+;; e.g. (copy-request/subst req :params p) - returns a copy of req,
+;; except it's param slot is substituted by p.
+(define (copy-request/subst req . substs)
+  ($ apply %make-request
+     (map (^s (or (get-keyword (make-keyword (slot-definition-name s))
+                               substs #f)
+                  (slot-ref req (slot-definition-name s))))
+          (class-slots request))))
 
 ;; API
 (define-inline (request-iport req) (socket-input-port (request-socket req)))
@@ -733,3 +742,24 @@
         (response-header-push! req (x->string (car h&v)) val)))
     (inner-handler req app)))
 
+;;;
+;;; Handling POST request
+;;;
+
+;; API
+;; part-handlers are the same as cgi-parse-parameters
+(define (with-post-parameters inner-handler :key (part-handlers '()))
+  (^[req app]
+    (if (eq? (request-method req) 'POST)
+      (let1 params
+          (parameterize ([cgi-metavariables
+                          (cond-list
+                           [(request-header-ref req "content-type")
+                            => (cut list "CONTENT_TYPE" <>)]
+                           [(request-header-ref req "content-length")
+                            => (cut list "CONTENT_LENGTH" <>)]
+                           [#t '("REQUEST_METHOD" "POST")])]
+                         [current-input-port (request-iport req)])
+            (cgi-parse-parameters :part-handlers part-handlers))
+        (inner-handler (copy-request/subst req :params params) app))
+      (inner-handler req app))))
