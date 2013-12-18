@@ -5,9 +5,6 @@
 ;; Run it in the top source directory of Gauche-makiki.
 ;;
 
-(load "../Gauche/lib/rfc/mime")
-(provide "rfc/mime")
-
 (add-load-path ".." :relative)
 
 (use gauche.threads)
