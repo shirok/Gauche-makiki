@@ -241,7 +241,7 @@ PART-HANDLERS specifies how to handle each parameter is handled
 according to its name.  By default, all parameter values are
 read into strings.  However, you might not want that behavior if
 you're accepting large file updates.  See the documentation of
-[`www.cgi` module](http://practical-scheme.net/gauche/man/?p=www.cgi)
+[`www.cgi`] (http://practical-scheme.net/gauche/man/?p=www.cgi) module
 for the meaning of PART-HANDLERS.
 
 
