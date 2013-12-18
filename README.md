@@ -303,6 +303,6 @@ Finally, to start the server, call `start-http-server`.
 
 ## Examples
 
-The [examples](examples/) directory contains sompe simple server scripts,
+The [examples](examples/) directory contains some simple server scripts,
 each one shows how to implement a specific fuctionality.
 
