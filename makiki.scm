@@ -62,7 +62,7 @@
           request?
           request-socket request-iport request-oport request-method
           request-server-host request-server-port
-          request-path request-path-rxmatch
+          request-path request-path-rxmatch request-guard-value
           request-response-error
           request-params  request-param-ref
           request-headers request-header-ref
@@ -83,9 +83,7 @@
 ;;;
 
 (define document-root (make-parameter "."))
-
 (define http-server-software (make-parameter "gauche/makiki"))
-
 (define file-mime-type (make-parameter (^[path] #f)))
 
 ;;;
@@ -132,7 +130,14 @@
   server-host         ; request host
   server-port         ; request port
   path                ; request path
-  path-rxmatch        ; #<rxmatch> object of matched path
+  (path-rxmatch)      ; #<regmatch> object of matched path
+                      ;  This slot is mutable just so that find-handler
+                      ;  can reuse the same request record in case the guard
+                      ;  procedure rejects the match.  Handlers should treat
+                      ;  this field as read-only.
+  (guard-value)       ; the result of guard procedure.
+                      ;  set by dispatcher; handlers should treat this field
+                      ;  immutable.
   query               ; unparsed query string
   params              ; query parameters
   headers             ; request headers
@@ -153,7 +158,7 @@
     (%make-request line socket (socket-getpeername socket)
                    (string->symbol (string-upcase method))
                    h (if p (x->integer p) 80)
-                   path rxmatch (or query "")
+                   path rxmatch #f (or query "")
                    (cgi-parse-parameters :query-string (or query ""))
                    headers #f
                    (delay (%request-parse-cookies headers)) '()
@@ -161,7 +166,7 @@
 
 (define-inline (make-ng-request msg socket)
   (%make-request msg socket (socket-getpeername socket)
-                 "" "" 80 "" #f "" '() '() #f '() '() #f '() 0))
+                 "" "" 80 "" #f #f "" '() '() #f '() '() #f '() 0))
 
 ;; e.g. (copy-request/subst req :params p) - returns a copy of req,
 ;; except it's param slot is substituted by p.
@@ -399,28 +404,45 @@
 ;;
 ;;  handler :: Request App -> IO ()
 ;;
-;; The server test the request path against path-rx and calls matching handler.
-;; A handler can be defined declaratively:
+;; The handler is responsible to process the request, and to call respond/*
+;; procedure to send the response.
 ;;
-;;   (define-http-handler path-rx handler)
+;; Handlers can be registered by define-http-handler:
 ;;
-;; Or can be registered procedurally:
+;;   (define-http-handler path-rx [? guard] handler)
 ;;
-;;   (add-http-handler! path-rx handler)
+;; path-rx is regexp.  Guard is a procedure :: Request App -> Boolean.
+;;
+;; The server tries to match each path-rx with the request path in the
+;; order of registration.  When they match, and no guard procedure is given,
+;; the corresponding handler is called.
+;;
+;; If the guard procedure is given in the matched handler, it is called
+;; first; if it returns a true value, the handler is called; otherwise
+;; the server keeps trying to match.
+;;
+;; Alternatively, the handler can registered procedurally:
+;;
+;;   (add-http-handler! path-rx handler [guard])
 
 ;; API
 (define-syntax define-http-handler
-  (syntax-rules ()
+  (syntax-rules (?)
+    [(_ path-rx ? guard handler) (add-http-handler! path-rx handler guard)]
     [(_ path-rx handler) (add-http-handler! path-rx handler)]))
 
 ;; API
-(define (add-http-handler! path-rx handler)
-  (enqueue! *handlers* (cons path-rx handler)))
+(define (add-http-handler! path-rx handler :optional (guard (^[m a] #t)))
+  (enqueue! *handlers* (list path-rx guard handler)))
 
-;; returns (handler rxmatch)
-(define (find-handler path)
-  (any-in-queue (^p (and-let* ([m ((car p) path)])
-                      `(,(cdr p) ,m)))
+;; returns (handler req)
+(define (find-handler path req app)
+  (any-in-queue (^[entry]
+                  (and-let* ([m ((car entry) path)]
+                             [g (begin (request-path-rxmatch-set! req m)
+                                       ((cadr entry) req app))])
+                    (request-guard-value-set! req g)
+                    (list (caddr entry) req)))
                 *handlers*))
 
 ;;;
@@ -484,18 +506,14 @@
         [#/^(GET|HEAD|POST)\s+(\S+)\s+HTTP\/\d+\.\d+$/ (_ meth abs-path)
          (receive (auth path query frag) (uri-decompose-hierarchical abs-path)
            (let* ([path (uri-decode-string path :cgi-decode #t)]
-                  [handler&match (find-handler path)]
                   [hdrs (rfc822-read-headers iport)]
                   [host ($ rfc822-header-ref hdrs "host"
                            $ sockaddr-name $ socket-getsockname csock)]
-                  [req (make-request line csock meth host path
-                                     (cond [handler&match => cadr] [else #f])
-                                     query hdrs)])
-             (if handler&match
-               ((car handler&match) req app)
-               (respond/ng req 404))))]
-        [#/^[A-Z]+.*/ ()
-          (respond/ng (make-ng-request #`"[E] ,line" csock) 501)]
+                  [req (make-request line csock meth host path #f query hdrs)])
+             (match (find-handler path req app)
+               [(handler req) (handler req app)]
+               [_ (respond/ng req 404)])))]
+        [#/^[A-Z]+.*/ () (respond/ng (make-ng-request #`"[E] ,line" csock) 501)]
         [else (respond/ng (make-ng-request #`"[E] ,line" csock) 400)]))))
 
 ;;;
@@ -733,6 +751,7 @@
 ;;; Adds header
 ;;;
 
+;; API
 (define (with-header-handler inner-handler . header&values)
   (^[req app]
     (dolist [h&v (slices header&values 2 :fill? #t)]

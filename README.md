@@ -12,22 +12,41 @@ You need Gauche 0.9.3 or later to use Gauche-makiki.
 
 ## Handling requests
 
+### Registering handlers
+
 To use the server, you should define _http-handler_ using
 `define-http-handler` macro:
 
-    (define-http-handler REGEXP PROC)
+    (define-http-handler REGEXP [? GUARD-PROC] HANDLER-PROC)
 
 Or, handlers can be added procedurally using `add-http-handler`:
 
-    (add-http-handler! REGEXP PROC)
+    (add-http-handler! REGEXP HANDLER-PROC :optional GUARD-PROC)
 
 For each incoming request, the server matches its path of
 the request uri against `REGEXP`, and if it matches, the server
-calls `PROC` with two arguments.
+calls `HANDLER-PROC` with two arguments:
 
-    (proc REQUEST APP-DATA)
+    (handler-proc REQUEST APP-DATA)
 
-`REQUEST` is a request record (only publicly exposed slots are shown):
+`REQUEST` is a request record, explained below.
+`APP-DATA` is an application-specific data given at the time the server
+is started.
+
+The optional `GUARD-PROC` is a procedure called right after the
+server finds the request path matches `REGEXP`, with two arguments,
+`REQUEST` and `APP-DATA`.  If the guard proc returns false,
+the server won't call the corresponding handler and look for
+another match.  It is useful to refine the condition the handler
+is called.
+
+If the guard procedure` returns a true value, it is available to the
+handler procedure as `guard-value` slot of the request.
+
+### Request record
+
+Here's the request record passed to the handlers and guard procedures.
+Only public slots are shown.
 
     (define-record-type request  %make-request #t
       line                ; the first line of the request
@@ -38,6 +57,7 @@ calls `PROC` with two arguments.
       server-port         ; request port (integer)
       path                ; request path (string, url decoded)
       path-rxmatch        ; #<regmatch> object of matched path
+      guard-value         ; the result of guard procedure
       query               ; unparsed query string
       params              ; query parameters (result of cgi-parse-parameters)
       headers             ; request headers (result of rfc822-read-headers)
@@ -46,8 +66,6 @@ calls `PROC` with two arguments.
                           ;  this slot and take actions in case of an error.
       ...)
 
-`APP-DATA` is an application-specific data given at the time the server
-is started.
 
 The following convenience procedures are avaiable on the request record.
 
@@ -68,7 +86,10 @@ The following convenience procedures are avaiable on the request record.
                             ; in the request.
     (request-cookie-ref REQ COOKIE-NAME :optional (DEFAULT #f))
                             ; returns one entry of the parsed cookie with
-                            ; the given COOKIE-NAME.
+                            ; the given COOKIE-NAME.  The returned value
+                            ; is the result of `parse-cookie-string` of
+                            ; `rfc.cookie`, i.e.
+                            ; `(<name> <value> <cookie-parameters> ...)`
 
 The handler procedure can set/modify response headers using
 the following procedures.
