@@ -252,7 +252,7 @@ but the parameters passed via POST body aren't processed by default.
 The following procedure returns a handler that parses POST request body
 and put the parsed result to `request-params`:
 
-   (with-post-parameters INNER-HANDLER :key PART-HANDLERS)
+    (with-post-parameters INNER-HANDLER :key PART-HANDLERS)
 
 The REQUEST structure the INNER-HANDLER receives got parsed parameters
 (If the original request also has a query string in url, that will be
