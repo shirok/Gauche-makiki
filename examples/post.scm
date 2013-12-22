@@ -17,7 +17,7 @@
     (start-http-server :access-log #t :error-log #t :port port))
   0)
 
-(define-http-handler #/^\/$/
+(define-http-handler "/"
   (^[req app]
     ($ respond/ok req
        '(sxml
@@ -30,7 +30,7 @@
                  (input (@ (type "submit") (name "submit")
                            (value "post"))))))))))
 
-(define-http-handler #/^\/post$/
+(define-http-handler "/post"
   (with-post-parameters
    (^[req app]
      ($ respond/ok req

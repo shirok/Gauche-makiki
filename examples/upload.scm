@@ -22,7 +22,7 @@
     (start-http-server :access-log #t :error-log #t :port port))
   0)
 
-(define-http-handler #/^\/$/
+(define-http-handler "/"
   (^[req app]
     ($ respond/ok req
        '(sxml
@@ -37,10 +37,10 @@
                  (input (@ (type "submit") (name "submit")
                            (value "post"))))))))))
 
-(define-http-handler #/^\/upload$/
+(define-http-handler "/upload"
   (with-post-parameters
    (^[req app]
-     (let1 tnames #?=(request-param-ref req "files" :list #t)
+     (let1 tnames (request-param-ref req "files" :list #t)
        ($ respond/ok req
           `(sxml
             (html

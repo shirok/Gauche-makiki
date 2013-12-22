@@ -19,7 +19,7 @@
                        :app-data (atom '())))
   0)
 
-(define-http-handler #/\/$/
+(define-http-handler "/"
   (^[req app]
     (let ([name    (request-param-ref req "name")]
           [message (request-param-ref req "message")])
