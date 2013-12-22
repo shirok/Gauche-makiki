@@ -11,6 +11,6 @@
                        :port p))
   0)
 
-(define-http-handler #/^\/$/
+(define-http-handler "/"
   (cgi-handler env-main :script-name "env.scm"))
 

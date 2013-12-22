@@ -409,11 +409,12 @@
 ;;
 ;; Handlers can be registered by define-http-handler:
 ;;
-;;   (define-http-handler path-rx [? guard] handler)
+;;   (define-http-handler pattern [? guard] handler)
 ;;
-;; path-rx is regexp.  Guard is a procedure :: Request App -> Boolean.
+;; PATTERN is regexp or string.
+;; GUARD is a procedure :: Request App -> Boolean.
 ;;
-;; The server tries to match each path-rx with the request path in the
+;; The server tries to match each pattern with the request path in the
 ;; order of registration.  When they match, and no guard procedure is given,
 ;; the corresponding handler is called.
 ;;
@@ -428,12 +429,18 @@
 ;; API
 (define-syntax define-http-handler
   (syntax-rules (?)
-    [(_ path-rx ? guard handler) (add-http-handler! path-rx handler guard)]
-    [(_ path-rx handler) (add-http-handler! path-rx handler)]))
+    [(_ pattern ? guard handler) (add-http-handler! pattern handler guard)]
+    [(_ pattern handler) (add-http-handler! pattern handler)]))
 
 ;; API
-(define (add-http-handler! path-rx handler :optional (guard (^[m a] #t)))
-  (enqueue! *handlers* (list path-rx guard handler)))
+(define (add-http-handler! pattern handler :optional (guard (^[m a] #t)))
+  (let1 rx (cond [(regexp? pattern) pattern]
+                 [(string? pattern)
+                  ($ string->regexp
+                     $ string-append "^" (regexp-quote pattern) "$")]
+                 [else (error "pattern must be a regexp or a string, but got"
+                              pattern)])
+    (enqueue! *handlers* (list rx guard handler))))
 
 ;; returns (handler req)
 (define (find-handler path req app)

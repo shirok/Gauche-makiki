@@ -23,7 +23,7 @@
   0)
 
 ;; The root path handler.  We show some html, constructed by text.html-lite.
-(define-http-handler #/^\/$/
+(define-http-handler "/"
   (^[req app]
     (respond/ok req
       (html:html
@@ -46,11 +46,11 @@
   (file-handler :path-trans (^[req] ((request-path-rxmatch req) 1))))
 
 ;; Redirect "/src" to "/src/".
-(define-http-handler #/\/src$/
+(define-http-handler "/src"
   (^[req app] (respond/redirect req "/src/")))
 
 ;; '/echo-header' reports back http request headers, handy for diagnostics.
-(define-http-handler #/\/echo-headers$/
+(define-http-handler "/echo-headers"
   (^[req app]
     (respond/ok req
                 (html:html

@@ -8,7 +8,7 @@
                        :port p))
   0)
 
-(define-http-handler #/^\/$/
+(define-http-handler "/"
   (cgi-script "tests/env.scm"))
 
 

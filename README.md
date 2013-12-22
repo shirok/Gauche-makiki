@@ -17,15 +17,19 @@ You need Gauche 0.9.3 or later to use Gauche-makiki.
 To use the server, you should define _http-handler_ using
 `define-http-handler` macro:
 
-    (define-http-handler REGEXP [? GUARD-PROC] HANDLER-PROC)
+    (define-http-handler PATTERN [? GUARD-PROC] HANDLER-PROC)
 
 Or, handlers can be added procedurally using `add-http-handler`:
 
-    (add-http-handler! REGEXP HANDLER-PROC :optional GUARD-PROC)
+    (add-http-handler! PATTERN HANDLER-PROC :optional GUARD-PROC)
+
+`PATTERN` can be a regexp or a string.
 
 For each incoming request, the server matches its path of
-the request uri against `REGEXP`, and if it matches, the server
-calls `HANDLER-PROC` with two arguments:
+the request uri against `PATTERN`.  If `PATTERN` is a string,
+entire request path must match exactly to the pattern.  If `PATTERN`
+is a regexp, `rxmatch` is used.  When the request path matches,
+the server calls `HANDLER-PROC` with two arguments:
 
     (handler-proc REQUEST APP-DATA)
 
@@ -34,7 +38,7 @@ calls `HANDLER-PROC` with two arguments:
 is started.
 
 The optional `GUARD-PROC` is a procedure called right after the
-server finds the request path matches `REGEXP`, with two arguments,
+server finds the request path matches `PATTERN`, with two arguments,
 `REQUEST` and `APP-DATA`.  If the guard proc returns false,
 the server won't call the corresponding handler and look for
 another match.  It is useful to refine the condition the handler
