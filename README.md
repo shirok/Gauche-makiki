@@ -136,29 +136,29 @@ has disconnected prematurely), an error condition is stored in
 
 The response body for `respond/ok` can be one of the following forms:
 
-* <string> : A string is sent back as `text/plain; charset=utf-8`.
+* _string_ : A string is sent back as `text/plain; charset=utf-8`.
 
-* <text-tree> : A tree of strings; see `text.tree`.  Concatenated string
+* _text-tree_ : A tree of strings; see `text.tree`.  Concatenated string
 is sent back as `text/plain; charset=utf-8`.
 
-* <u8vector> : The content of the vector is sent back as
+* _u8vector_ : The content of the vector is sent back as
 `application/binary`.
 
-* (`file` <filename>) : The content of the named file is sent back.
+* (`file` _filename_) : The content of the named file is sent back.
 Content-type is determined by the file's extension by default.
 See the description of `file-handler` below for the details of
 content-type handling.
 
-* (`plain` <lisp-object>) : The lisp object is converted to a string
+* (`plain` _lisp-object_) : The lisp object is converted to a string
 by `write-to-string`, then sent back as `text/plain; charset=utf-8`.
 
-* (`json` <alist-or-vector>) : The argument is converted to a JSON
+* (`json` _alist-or-vector_) : The argument is converted to a JSON
 by `construct-json-string` (see `rfc.json`), then sent back as
 `application/json; charset=utf-8`.
 
-* (`sxml` <sxml>) : The SXML tree is rendered by `sxml:sxml->html`.
+* (`sxml` _sxml_) : The SXML tree is rendered by `sxml:sxml->html`.
 
-* (`chunks` <string-or-u8vector> ...) : Chunks are concatenated
+* (`chunks` _string-or-u8vector_ ...) : Chunks are concatenated
 and sent back as `application/octed-stream`.  This form allows
 you to pass a lazy list, so that you can avoid creating entire
 content in memory.
