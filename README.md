@@ -44,8 +44,10 @@ the server won't call the corresponding handler and look for
 another match.  It is useful to refine the condition the handler
 is called.
 
-If the guard procedure` returns a true value, it is available to the
-handler procedure as `guard-value` slot of the request.
+If the guard procedure returns a true value, it is stored in the
+`guard-value` slot of the request record, and avaible to the
+handler procedure.
+
 
 ### Request record
 
@@ -81,7 +83,7 @@ The following convenience procedures are avaiable on the request record.
                             ;  writing response line and headers.
 
     (request-param-ref REQ PARAM-NAME . keys)
-                            ; Retrive request query-string parameter with
+                            ; Retrieve request query-string parameter with
                             ; PARAM-NAME.  KEYS are a keyward-value list
                             ; passed to cgi-get-parameter in www.cgi.
     (request-header-ref REQ HEADER-NAME :optional (DEFAULT #f))
@@ -108,15 +110,13 @@ the following procedures.
 the response message; it does not remove the cookie from the client.)
 
 
-`PROC` should call one of the following respond procedure at the tail
-position.   NB: These must be extended greatly to support various
-types of replies.
+`HANDER-PROC` should call one of the following respond procedure at
+the tail position.   NB: These must be extended greatly to support
+various types of replies.
 
-    (respond/ok REQ BODY)   ; BODY can be <string>, (file <filename>),
-                            ;   (plain <lisp-object>), (json <alist>),
-                            ;   or text-tree (cf. text.tree)
-                            ; This returns 200 response to the client,
-                            ; with the specified content.
+    (respond/ok REQ BODY)   ; This returns 200 response to the client,
+                            ; with BODY as the response body.  See below
+                            ; for allowed values in BODY.
 
     (respond/ng REQ CODE)   ; This returns CODE response to the client.
                             ; the body consists of the description of the
@@ -133,6 +133,35 @@ These procedures return after entire message is sent.  If an error
 occurs during sending the message (most likely because the client
 has disconnected prematurely), an error condition is stored in
 (request-response-error REQ).
+
+The response body for `respond/ok` can be one of the following forms:
+
+* <string> : A string is sent back as `text/plain; charset=utf-8`.
+
+* <text-tree> : A tree of strings; see `text.tree`.  Concatenated string
+is sent back as `text/plain; charset=utf-8`.
+
+* <u8vector> : The content of the vector is sent back as
+`application/binary`.
+
+* (`file` <filename>) : The content of the named file is sent back.
+Content-type is determined by the file's extension by default.
+See the description of `file-handler` below for the details of
+content-type handling.
+
+* (`plain` <lisp-object>) : The lisp object is converted to a string
+by `write-to-string`, then sent back as `text/plain; charset=utf-8`.
+
+* (`json` <alist-or-vector>) : The argument is converted to a JSON
+by `construct-json-string` (see `rfc.json`), then sent back as
+`application/json; charset=utf-8`.
+
+* (`sxml` <sxml>) : The SXML tree is rendered by `sxml:sxml->html`.
+
+* (`chunks` <string-or-u8vector> ...) : Chunks are concatenated
+and sent back as `application/octed-stream`.  This form allows
+you to pass a lazy list, so that you can avoid creating entire
+content in memory.
 
 Check out scripts in `examples` directory for some concrete examples.
 
