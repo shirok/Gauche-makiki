@@ -173,7 +173,7 @@ suitable handler.  The following procedures return a procedure
 that can be directly passed to `define-http-handler`; for example,
 the following handler definition serves files under `document-root`:
 
-    (define-http-handler #/^\/  (file-handler))
+    (define-http-handler "/"  (file-handler))
 
 Some handler-builders takes another handler procedure and returns
 a new handler that auguments the original handler.  
