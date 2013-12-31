@@ -38,15 +38,18 @@ the server calls `HANDLER-PROC` with two arguments:
 is started.
 
 The optional `GUARD-PROC` is a procedure called right after the
-server finds the request path matches `PATTERN`, with two arguments,
+server finds the request path matches `PATTERN`.
+It is called with two arguments,
 `REQUEST` and `APP-DATA`.  If the guard proc returns false,
 the server won't call the corresponding handler and look for
-another match.  It is useful to refine the condition the handler
-is called.
+another match instead.
+It is useful to refine the condition the handler is called.
 
-If the guard procedure returns a true value, it is stored in the
+If the guard procedure returns a non-false value, it is stored in the
 `guard-value` slot of the request record, and avaible to the
 handler procedure.
+See [examples/session.scm](examples/session.scm) for an example
+of using a guard procedure and the request's `guard-value` slot.
 
 
 ### Request record
