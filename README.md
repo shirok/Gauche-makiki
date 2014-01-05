@@ -113,17 +113,22 @@ the following procedures.
 the response message; it does not remove the cookie from the client.)
 
 
+### Response
+
 `HANDER-PROC` should call one of the following respond procedure at
 the tail position.   NB: These must be extended greatly to support
 various types of replies.
 
-    (respond/ok REQ BODY)   ; This returns 200 response to the client,
+    (respond/ok REQ BODY)
+                            ; This returns 200 response to the client,
                             ; with BODY as the response body.  See below
                             ; for allowed values in BODY.
 
-    (respond/ng REQ CODE)   ; This returns CODE response to the client.
-                            ; the body consists of the description of the
-                            ; HTTP code.
+    (respond/ng REQ CODE :key BODY)
+                            ; This returns CODE response to the client.
+                            ; If BODY keyword arg is omitted, the body
+                            ; consists of the description of the HTTP code.
+                            ; See below for allowed values in BODY.
 
     (respond/redirect REQ URI :optional (CODE 302))
                             ; Send back a redirection message using Location
@@ -137,7 +142,8 @@ occurs during sending the message (most likely because the client
 has disconnected prematurely), an error condition is stored in
 (request-response-error REQ).
 
-The response body for `respond/ok` can be one of the following forms:
+The response body for `respond/ok` and `respond/ng` can be one of
+the following forms:
 
 * _string_ : A string is sent back as `text/plain; charset=utf-8`.
 
@@ -167,6 +173,9 @@ you to pass a lazy list, so that you can avoid creating entire
 content in memory.
 
 Check out scripts in `examples` directory for some concrete examples.
+
+
+The handler can also throw an exception 
 
 
 ## Built-in handlers

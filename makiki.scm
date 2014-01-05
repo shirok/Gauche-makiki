@@ -287,12 +287,12 @@
 ;; lazily feed the file content to the client.
 (define (%respond req code content-type content)
   (request-status-set! req code)
-  (request-response-size-set! req
-                              (cond
-                               [(string? content) (string-size content)]
-                               [(u8vector? content) (u8vector-length content)]
-                               [(pair? content) (car content)]
-                               [else (error "invalid response content:" content)]))
+  ($ request-response-size-set! req
+     (cond
+      [(string? content) (string-size content)]
+      [(u8vector? content) (u8vector-length content)]
+      [(pair? content) (car content)]
+      [else (error "invalid response content:" content)]))
   (let ([port (request-oport req)]
         [desc (hash-table-get *status-code-map* code "")])
     (define (p x) (if (u8vector? x) (write-block x port) (display x port)))
@@ -320,13 +320,68 @@
          [(pair? content) (dolist [chunk (cdr content)] (p chunk))]))
       (flush port))))
 
+;; Handle 'body' argument for respond/ok to respond/ng.  Returns
+;; content-type and <content>.  If content-type arg is #f, we assume
+;; the default content type, according to the BODY form.  Note that
+;; 'file' body may ranse an condition 404 if the file doesn't exist.
+;;
+;; Supported forms:
+;;  <string>
+;;  <u8vector>
+;;  (file <filename>)
+;;  (plain <object>)
+;;  (json <alist-or-vector>)
+;;  (sxml <sxml>)
+;;  (chunks <chunk> ...)
+;;  <text-tree>
+;;
+(define (%response-body content-type body only-headers?)
+  (let-syntax ([v (syntax-rules ()
+                    [(_ ctype content)
+                     (values (or content-type ctype) content)])])
+    (match body
+      [(? string?) (v "text/html; charset=utf-8" body)]
+      [(? u8vector?) (v "application/binary" body)]
+      [('file filename)
+       (if-let1 content (%fetch-file-content filename (not only-headers?))
+         (v (or ((file-mime-type) filename)
+                (default-file-mime-type filename))
+            content)
+         (raise 404))]
+      [('plain obj) (v "text/plain; charset=utf-8"
+                       (write-to-string obj display))]
+      [('json alist)(v "application/json; charset=utf-8"
+                       (construct-json-string alist))]
+      [('sxml node) (v "text/html; charset=utf-8"
+                       (tree->string (sxml:sxml->html node)))]
+      [('chunks . chunks)
+       ;; NB: Once we support chunked output, we don't need to calculate
+       ;; the total length.
+       (v "application/octet-stream" ; take safe side for the default
+          `(,(fold (^[c s]
+                     (+ s (cond [(string? c) (string-size c)]
+                                [(u8vector? c) (uvector-size c)]
+                                [else (error "invalid chunk:" c)])))
+                   0 chunks)
+            ,@chunks))]
+      [((? symbol? y) .  _) (error "invalid response body type:" y)]
+      [else (v "text/html; charset=utf-8" (tree->string body))])))
+  
 ;; API
 ;; returns Request
 ;; If no-response, close connection immediately without sending response.
-(define (respond/ng req code :key (keepalive #f) (no-response #f))
+(define (respond/ng req code :key (keepalive #f) (no-response #f) (body #f))
   (unless no-response
-    (%respond req code "text/plain; charset=utf-8"
-              (hash-table-get *status-code-map* code "")))
+    (if body
+      (guard (e [(integer? e) (respond/ng req e)]
+                [else (error-log "respond/ng error ~s" (~ e'message))
+                      (respond/ng req 500)])
+        (receive (content-type content)
+            ($ %response-body #f
+               (or body (hash-table-get *status-code-map* code "")) #f)
+          (%respond req code content-type content)))
+      (%respond req code "text/plain; charset=utf-8"
+                (hash-table-get *status-code-map* code ""))))
   (unless (and keepalive (not no-response))
     (socket-close (request-socket req)))
   req)
@@ -334,40 +389,14 @@
 ;; API
 ;; returns Request
 (define (respond/ok req body :key (keepalive #f) (content-type #f))
-  (define (resp ctype body) (%respond req 200 ctype body))
-  (define has-body? (not (eq? (request-method req) 'HEAD)))
+  (define headers-only? (eq? (request-method req) 'HEAD))
   (unwind-protect
-      (guard (e [else (error-log "respond/ok error ~s" (~ e'message))
+      (guard (e [(integer? e) (respond/ng req e)]
+                [else (error-log "respond/ok error ~s" (~ e'message))
                       (respond/ng req 500)])
-        (match body
-          [(? string?) (resp "text/html; charset=utf-8" body)]
-          [(? u8vector?) (resp "application/binary" body)]
-          [('file filename)
-           (let ([ctype (or content-type
-                            ((file-mime-type) filename)
-                            (default-file-mime-type filename))]
-                 [content (%fetch-file-content filename has-body?)])
-             (if content
-               (resp ctype content)
-               (respond/ng req 404)))]
-          [('plain obj) (resp "text/plain; charset=utf-8"
-                              (write-to-string obj display))]
-          [('json alist)(resp "application/json; charset=utf-8"
-                              (construct-json-string alist))]
-          [('sxml node) (resp "text/html; charset=utf-8"
-                              (tree->string (sxml:sxml->html node)))]
-          [('chunks . chunks)
-           ;; NB: Once we support chunked output, we don't need to calculate
-           ;; the total length.
-           (resp "application/octet-stream" ; take safe side for the default
-                 `(,(fold (^[c s]
-                            (+ s (cond [(string? c) (string-size c)]
-                                       [(u8vector? c) (uvector-size c)]
-                                       [else (error "invalid chunk:" c)])))
-                          0 chunks)
-                   ,@chunks))]
-          [((? symbol? y) .  _) (error "invalid response body type:" y)]
-          [else (resp "text/html; charset=utf-8" (tree->string body))])
+        (receive (content-type content)
+            (%response-body content-type body headers-only?)
+          (%respond req 200 content-type content))
         req)
     (unless keepalive (socket-close (request-socket req)))))
 
