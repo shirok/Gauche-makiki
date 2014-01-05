@@ -119,10 +119,12 @@ the response message; it does not remove the cookie from the client.)
 the tail position.   NB: These must be extended greatly to support
 various types of replies.
 
-    (respond/ok REQ BODY)
+    (respond/ok REQ BODY :key CONTENT-TYPE)
                             ; This returns 200 response to the client,
                             ; with BODY as the response body.  See below
                             ; for allowed values in BODY.
+                            ; CONTENT-TYPE argument can override the default
+                            ; content-type inferred from BODY.
 
     (respond/ng REQ CODE :key BODY)
                             ; This returns CODE response to the client.
@@ -143,7 +145,8 @@ has disconnected prematurely), an error condition is stored in
 (request-response-error REQ).
 
 The response body for `respond/ok` and `respond/ng` can be one of
-the following forms:
+the following forms.  The content type can be overridden by
+`CONTENT-TYPE` keyword argument.
 
 * _string_ : A string is sent back as `text/plain; charset=utf-8`.
 
@@ -173,9 +176,6 @@ you to pass a lazy list, so that you can avoid creating entire
 content in memory.
 
 Check out scripts in `examples` directory for some concrete examples.
-
-
-The handler can also throw an exception 
 
 
 ## Built-in handlers

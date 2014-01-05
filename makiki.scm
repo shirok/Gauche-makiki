@@ -370,14 +370,15 @@
 ;; API
 ;; returns Request
 ;; If no-response, close connection immediately without sending response.
-(define (respond/ng req code :key (keepalive #f) (no-response #f) (body #f))
+(define (respond/ng req code :key (keepalive #f) (no-response #f) (body #f)
+                                  (content-type #f))
   (unless no-response
     (if body
       (guard (e [(integer? e) (respond/ng req e)]
                 [else (error-log "respond/ng error ~s" (~ e'message))
                       (respond/ng req 500)])
         (receive (content-type content)
-            ($ %response-body #f
+            ($ %response-body content-type
                (or body (hash-table-get *status-code-map* code "")) #f)
           (%respond req code content-type content)))
       (%respond req code "text/plain; charset=utf-8"
