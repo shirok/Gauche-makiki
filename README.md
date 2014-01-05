@@ -126,7 +126,7 @@ various types of replies.
                             ; CONTENT-TYPE argument can override the default
                             ; content-type inferred from BODY.
 
-    (respond/ng REQ CODE :key BODY)
+    (respond/ng REQ CODE :key BODY CONTENT-TYPE)
                             ; This returns CODE response to the client.
                             ; If BODY keyword arg is omitted, the body
                             ; consists of the description of the HTTP code.
