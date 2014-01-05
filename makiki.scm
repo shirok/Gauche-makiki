@@ -350,8 +350,11 @@
                        (write-to-string obj display))]
       [('json alist)(v "application/json; charset=utf-8"
                        (construct-json-string alist))]
-      [('sxml node) (v "text/html; charset=utf-8"
-                       (tree->string (sxml:sxml->html node)))]
+      [('sxml node) (match node
+                      [('html . _) (v "text/html; charset=utf-8"
+                                      (tree->string (sxml:sxml->html node)))]
+                      [_           (v "application/xml"
+                                      (tree->string (sxml:sxml->html node)))])]
       [('chunks . chunks)
        ;; NB: Once we support chunked output, we don't need to calculate
        ;; the total length.

@@ -168,7 +168,11 @@ by `write-to-string`, then sent back as `text/plain; charset=utf-8`.
 by `construct-json-string` (see `rfc.json`), then sent back as
 `application/json; charset=utf-8`.
 
-* (`sxml` _sxml_) : The SXML tree is rendered by `sxml:sxml->html`.
+* (`sxml` _sxml_) : The SXML tree is rendered by to XML or HTML. (If
+the root node of _sxml_ is `html`, then `sxml:sxml->html` is used to
+render to HTML with content type `text/html; charset=utf-8`.  Otherwise
+`sxml:sxml->xml` is used to render to XML, with conten type
+`application/xml`.
 
 * (`chunks` _string-or-u8vector_ ...) : Chunks are concatenated
 and sent back as `application/octed-stream`.  This form allows
