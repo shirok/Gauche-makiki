@@ -558,9 +558,16 @@
                   [host ($ rfc822-header-ref hdrs "host"
                            $ sockaddr-name $ socket-getsockname csock)]
                   [req (make-request line csock meth host path #f query hdrs)])
-             (match (find-handler path req app)
-               [(handler req) (handler req app)]
-               [_ (respond/ng req 404)])))]
+             (unwind-protect
+                 (match (find-handler path req app)
+                   [(handler req) (handler req app)]
+                   [_ (respond/ng req 404)])
+               ;; Clean temp files created by with-post-parameters
+               ;; NB: We can use a parameter, assuming one thread handles
+               ;; one request at a time.  If we introduce coroutines
+               ;; (a thread may switch handling requests), we need to avoid
+               ;; using cgi-temporary-files.
+               (for-each sys-unlink (cgi-temporary-files)))))]
         [#/^[A-Z]+.*/ () (respond/ng (make-ng-request #`"[E] ,line" csock) 501)]
         [else (respond/ng (make-ng-request #`"[E] ,line" csock) 400)]))))
 
