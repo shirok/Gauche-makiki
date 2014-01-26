@@ -109,5 +109,13 @@
            (receive (code hdrs body) (http-get *server* "/favicon.ico")
              (list code (rfc822-header-ref hdrs "content-type") body)))))
 
+(test-section "sxml template")
+
+($ call-with-server "tests/sxml-tmpl.scm"
+   (^p
+    (test* "sxml-tmpl"
+           "<html><body><p>Yo, Keoki.  Howzit?</p></body></html>"
+           (values-ref (http-get *server* "/?g=2&name=Keoki") 2))))
+
 ;; epilogue
 (test-end)

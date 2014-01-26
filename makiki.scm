@@ -350,11 +350,13 @@
                        (write-to-string obj display))]
       [('json alist)(v "application/json; charset=utf-8"
                        (construct-json-string alist))]
-      [('sxml node) (match node
-                      [('html . _) (v "text/html; charset=utf-8"
-                                      (tree->string (sxml:sxml->html node)))]
-                      [_           (v "application/xml"
-                                      (tree->string (sxml:sxml->html node)))])]
+      [('sxml node . substs)
+       (let1 n (if (null? substs) node (%sxml-subst node substs))
+         (match n
+           [('html . _) (v "text/html; charset=utf-8"
+                           (tree->string (sxml:sxml->html n)))]
+           [_           (v "application/xml"
+                           (tree->string (sxml:sxml->xml n)))]))]
       [('chunks . chunks)
        ;; NB: Once we support chunked output, we don't need to calculate
        ;; the total length.
@@ -367,7 +369,15 @@
             ,@chunks))]
       [((? symbol? y) .  _) (error "invalid response body type:" y)]
       [else (v "text/html; charset=utf-8" (tree->string body))])))
-  
+
+;; Experimental: SXML template
+;; TOOD: Repeating pattern
+(define (%sxml-subst tree substs)
+  (cond [(symbol? tree) (assq-ref substs tree tree)]
+        [(pair? tree)
+         (cons (car tree) (map (cut %sxml-subst <> substs) (cdr tree)))]
+        [else tree]))
+
 ;; API
 ;; returns Request
 ;; If no-response, close connection immediately without sending response.
