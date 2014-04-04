@@ -1,0 +1,12 @@
+Some sample server scripts.
+
+basic - showcases of the basic setup, procedural output, and serving from files.
+
+query - handling GET query-string parameters.
+
+post - handling POST request
+
+upload -handling file upload
+
+session - session management
+
