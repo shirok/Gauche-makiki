@@ -139,7 +139,7 @@ various types of replies.
                             ; protocol, host and port compoents are 
                             ; automatically added.
 
-These procedures return after entire message is sent.  If an error
+These procedures return after the entire message is sent.  If an error
 occurs during sending the message (most likely because the client
 has disconnected prematurely), an error condition is stored in
 (request-response-error REQ).
@@ -243,8 +243,8 @@ Loading is done only once unless LOAD-EVERY-TIME is true.
 Usually, loading only once cuts the overhead of script loading for
 repeating requests.  However, if the cgi script sets some global
 state, it should be loaded for every request---a script can
-be executed concurrently, so any code relying on a shared mutable
-global state will fail.
+be executed concurrently by multiple threads, so any code
+relying on a shared mutable global state will fail.
 Note also that we assume the script itself isn't written inside
 a specific module; if it has it's own define-module and
 select-module, the module will be shared for every load, and
@@ -256,10 +256,10 @@ from the environment variables.
 
 SCRIPT-NAME is the path to the script *in the URL*.  That is,
 if the script is accessible via `http://example.com/foo/bar/baz.cgi`,
-then it should be `"/foo/bar/baz.cgi"`.  It isn't related to
-the actual pathname of the cgi script file.  The value becomes
-the value of `SCRIPT_NAME` CGI metavariable, and also used to
-calculate `PATH_INFO` CGI metavariable.
+then it should be `"/foo/bar/baz.cgi"`.  It doesn't need to be
+related to the actual pathname of the cgi script file.  The value
+becomes the value of `SCRIPT_NAME` CGI metavariable, and also
+used to calculate `PATH_INFO` CGI metavariable.
 
     (cgi-handler PROC :key SCRIPT-NAME)
 
@@ -356,11 +356,11 @@ Finally, to start the server, call `start-http-server`.
        For access log, <log-drain> is better not to have prefix, for
        timestamp is included in the message.  The default is #f.
 
-    forwarded? - specify #t if you use makiki behind a reverse-proxy httpd.
-       Then access-log uses the value of x-forwarded-for header if exists,
+    forwarded? - specify true if you use makiki behind a reverse-proxy httpd,
+       and access-log uses the value of x-forwarded-for header if exists,
        instead of the client's address.
 
-    app-data - a opaque data passed to the request handler as is.
+    app-data - an opaque data passed to the request handler as is.
 
     startup-callback - a procedure to be called after the server opened
        sockets, but before start processing any requests.  A list of
