@@ -750,6 +750,10 @@
       (respond/ng req 403)      ;do not allow path traversal
       (let1 fpath (sys-normalize-pathname #`",(document-root),rpath")
         (cond [(file-is-readable? fpath)
+               ($ response-header-push! req "Last-modified"
+                  (date->string ($ time-utc->date
+                                   $ make-time time-utc 0 (file-mtime fpath))
+                                "~a, ~d ~b ~Y ~X ~z"))
                (if (file-is-directory? fpath)
                  (%handle-directory req fpath rpath dirindex)
                  (respond/ok req `(file ,fpath)))]
@@ -807,12 +811,18 @@
 ;;;
 
 ;; API
+;; header&values are keyword-value list.  Each keyword names header field,
+;; and the value can be a string, a procedure that takes REQ and APP to
+;; retrun a string value, or #f to omit the header.
 (define (with-header-handler inner-handler . header&values)
   (^[req app]
     (dolist [h&v (slices header&values 2 :fill? #t)]
-      (if-let1 val (if (or (string? (cadr h&v)) (not (cadr h&v)))
-                     (cadr h&v)
-                     ((cadr h&v) req app))
+      (if-let1 val (cond
+                    [(or (string? (cadr h&v)) (not (cadr h&v))) (cadr h&v)]
+                    [(applicable? (cadr h&v) (class-of req) (class-of app))
+                     ((cadr h&v) req app)]
+                    [else (errorf "with-header-handler: Invalid header value \
+                                   for header ~a: ~s" (car h&v) (cadr h&v))])
         (response-header-push! req (x->string (car h&v)) val)))
     (inner-handler req app)))
 
