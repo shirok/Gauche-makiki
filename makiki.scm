@@ -544,7 +544,7 @@
 (define (handle-client app csock)
   (guard (e [else
              (error-log "handle-client error ~s" (~ e'message))
-             (respond/ng (make-ng-request #`"[E] ,(~ e'message)" csock) 500)])
+             (respond/ng (make-ng-request #"[E] ~(~ e'message)" csock) 500)])
     (let* ([iport (socket-input-port csock)]
            [line (read-line (socket-input-port csock))])
       (rxmatch-case line
@@ -568,8 +568,8 @@
                ;; (a thread may switch handling requests), we need to avoid
                ;; using cgi-temporary-files.
                (for-each sys-unlink (cgi-temporary-files)))))]
-        [#/^[A-Z]+.*/ () (respond/ng (make-ng-request #`"[E] ,line" csock) 501)]
-        [else (respond/ng (make-ng-request #`"[E] ,line" csock) 400)]))))
+        [#/^[A-Z]+.*/ () (respond/ng (make-ng-request #"[E] ~line" csock) 501)]
+        [else (respond/ng (make-ng-request #"[E] ~line" csock) 400)]))))
 
 ;;;
 ;;; Logging
@@ -587,7 +587,7 @@
          (make <log-drain> :path dest
                :prefix (case kind
                          [(access-log) ""]
-                         [(error-log) (^_ #`",(logtime (current-time)): ")]
+                         [(error-log) (^_ #"~(logtime (current-time)): ")]
                          ))]))
 
 (define (logger pool forwarded?)
@@ -748,7 +748,7 @@
     (if (or (string-prefix? "/../" rpath)
             (string=? "/.." rpath))
       (respond/ng req 403)      ;do not allow path traversal
-      (let1 fpath (sys-normalize-pathname #`",(document-root),rpath")
+      (let1 fpath (sys-normalize-pathname #"~(document-root)~rpath")
         (cond [(file-is-readable? fpath)
                ($ response-header-push! req "Last-modified"
                   (date->string ($ time-utc->date
@@ -799,9 +799,9 @@
     [#/\.css$/ () "text/css"]
     [#/\.(mpg|mpeg)$/ () "video/mpeg"]
     [#/\.(mp4)$/ () "video/mp4"]
-    [#/\.(wm[xv]?)$/ (_ m) #`"video/x-ms-,m"]
-    [#/\.(wm[zd])$/ (_ m) #`"application/x-ms-,m"]
-    [#/\.(wma)$/ (_ m) #`"audio/x-ms-,m"]
+    [#/\.(wm[xv]?)$/ (_ m) #"video/x-ms-~m"]
+    [#/\.(wm[zd])$/ (_ m) #"application/x-ms-~m"]
+    [#/\.(wma)$/ (_ m) #"audio/x-ms-~m"]
     [#/\.wav$/ () "audio/wav"]
     [#/\.(html|htm)$/ () "text/html; charset=utf-8"]
     [else "text/plain"])) ; fallback
