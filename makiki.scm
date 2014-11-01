@@ -395,7 +395,7 @@
       (%respond req code "text/plain; charset=utf-8"
                 (hash-table-get *status-code-map* code ""))))
   (unless (and keepalive (not no-response))
-    (socket-close (request-socket req)))
+    (%socket-discard (request-socket req)))
   req)
 
 ;; API
@@ -410,7 +410,7 @@
             (%response-body content-type body headers-only?)
           (%respond req 200 content-type content))
         req)
-    (unless keepalive (socket-close (request-socket req)))))
+    (unless keepalive (%socket-discard (request-socket req)))))
 
 ;; Returns file contents as a lazy list of chunks, or #f
 ;; if we can't read the file.
@@ -528,7 +528,7 @@
                         (map (.$ sockaddr-name socket-address) ssocks))
             (while #t (selector-select sel)))
         (access-log "terminating")
-        (for-each socket-close ssocks)
+        (for-each %socket-discard ssocks)
         (tpool:terminate-all! pool :force-timeout 300)
         (thread-terminate! tlog)
         (when shutdown-callback (shutdown-callback))))))
@@ -536,10 +536,14 @@
 (define (kick-logger-thread pool forwarded?)
   (thread-start! (make-thread (cut logger pool forwarded?))))
 
+(define (%socket-discard sock)
+  (socket-close sock)
+  (socket-shutdown sock SHUT_RDWR))
+
 (define (accept-client app csock pool)
   (unless (tpool:add-job! pool (cut handle-client app csock) #t)
     (respond/ng (make-ng-request "[E] too many request backlog" csock) 503)
-    (socket-close csock)))
+    (%socket-discard csock)))
 
 (define (handle-client app csock)
   (guard (e [else
