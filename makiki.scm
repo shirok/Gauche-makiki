@@ -547,7 +547,17 @@
 
 (define (handle-client app csock)
   (guard (e [else
-             (error-log "handle-client error ~s" (~ e'message))
+             ;; As of Gauche-0.9.4, there's an issue that report-error prints
+             ;; nothing when called in a thread.  You need HEAD version of
+             ;; Gauche to get stack dump.
+             ;; We'll change report-error to take optional port argument by
+             ;; 0.9.5 release.  Once done,
+             ;; This can be just
+             ;; (call-with-output-string (cut report-error e <>))
+             (let1 trace (call-with-output-string
+                           (^o (with-error-to-port o
+                                 (cut report-error e))))
+               (error-log "handle-client error ~s\n~a" (~ e'message) trace))
              (respond/ng (make-ng-request #"[E] ~(~ e'message)" csock) 500)])
     (let* ([iport (socket-input-port csock)]
            [line (read-line (socket-input-port csock))])
