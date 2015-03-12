@@ -57,6 +57,7 @@
   (export start-http-server http-server-software
           access-log access-log-drain
           error-log error-log-drain
+          add-method-dispatcher!
           request?
           request-socket request-iport request-oport request-method
           request-server-host request-server-port
@@ -149,12 +150,10 @@
   (response-headers)  ; response headers (set by handler)
   (response-size))    ; size of reply content in octets (set by responder)
 
-
 (define-inline (make-request line socket method host:port path
                              rxmatch query headers)
   (rxmatch-let (#/^([^:]*)(?::(\d+))?$/ host:port) [_ h p]
-    (%make-request line socket (socket-getpeername socket)
-                   (string->symbol (string-upcase method))
+    (%make-request line socket (socket-getpeername socket) method
                    h (if p (x->integer p) 80)
                    path rxmatch #f (or query "")
                    (cgi-parse-parameters :query-string (or query ""))
@@ -286,11 +285,10 @@
 (define (%respond req code content-type content)
   (request-status-set! req code)
   ($ request-response-size-set! req
-     (cond
-      [(string? content) (string-size content)]
-      [(u8vector? content) (u8vector-length content)]
-      [(pair? content) (car content)]
-      [else (error "invalid response content:" content)]))
+     (cond [(string? content) (string-size content)]
+           [(u8vector? content) (u8vector-length content)]
+           [(pair? content) (car content)]
+           [else (error "invalid response content:" content)]))
   (let ([port (request-oport req)]
         [desc (hash-table-get *status-code-map* code "")])
     (define (p x) (if (u8vector? x) (write-block x port) (display x port)))
@@ -313,9 +311,8 @@
           (p (car h)) (p ": ") (p v) (crlf)))
       (crlf)
       (unless (eq? (request-method req) 'HEAD)
-        (cond
-         [(or (string? content) (u8vector? content)) (p content)]
-         [(pair? content) (dolist [chunk (cdr content)] (p chunk))]))
+        (cond [(or (string? content) (u8vector? content)) (p content)]
+              [(pair? content) (dolist [chunk (cdr content)] (p chunk))]))
       (flush port))))
 
 ;; Handle 'body' argument for respond/ok to respond/ng.  Returns
@@ -559,31 +556,49 @@
                                  (cut report-error e))))
                (error-log "handle-client error ~s\n~a" (~ e'message) trace))
              (respond/ng (make-ng-request #"[E] ~(~ e'message)" csock) 500)])
-    (let* ([iport (socket-input-port csock)]
-           [line (read-line (socket-input-port csock))])
+    (let1 line (read-line (socket-input-port csock))
       (rxmatch-case line
         [test eof-object?
          (respond/ng (make-ng-request "(empty request)" csock) 400
                      :no-response #t)]
-        [#/^(GET|HEAD|POST)\s+(\S+)\s+HTTP\/\d+\.\d+$/ (_ meth abs-path)
-         (receive (auth path query frag) (uri-decompose-hierarchical abs-path)
-           (let* ([path (uri-decode-string path :cgi-decode #t)]
-                  [hdrs (rfc822-read-headers iport)]
-                  [host ($ rfc822-header-ref hdrs "host"
-                           $ sockaddr-name $ socket-getsockname csock)]
-                  [req (make-request line csock meth host path #f query hdrs)])
-             (unwind-protect
-                 (match (find-handler path req app)
-                   [(handler req) (handler req app)]
-                   [_ (respond/ng req 404)])
-               ;; Clean temp files created by with-post-parameters
-               ;; NB: We can use a parameter, assuming one thread handles
-               ;; one request at a time.  If we introduce coroutines
-               ;; (a thread may switch handling requests), we need to avoid
-               ;; using cgi-temporary-files.
-               (for-each sys-unlink (cgi-temporary-files)))))]
-        [#/^[A-Z]+.*/ () (respond/ng (make-ng-request #"[E] ~line" csock) 501)]
+        [#/^(\w+)\s+(\S+)\s+HTTP\/\d+\.\d+$/ (_ meth request-uri)
+         (let1 method (string->symbol (string-upcase meth))
+           (if-let1 dispatcher (find-method-dispatcher method)
+             (dispatcher app csock line method request-uri)
+             (respond/ng (make-ng-request #"[E] ~line" csock) 501)))]
         [else (respond/ng (make-ng-request #"[E] ~line" csock) 400)]))))
+
+(define *method-dispatchers* (make-mtqueue))
+
+(define (find-method-dispatcher method)
+  (any-in-queue (^p (and (eq? (car p) method) (cdr p))) *method-dispatchers*))
+
+;; API
+(define (add-method-dispatcher! meth proc)
+  (enqueue! *method-dispatchers* (cons meth proc)))
+
+;; Default GET/HEAD/POST dispatcher
+(define (%default-dispatch app csock line method request-uri)
+  (receive (auth path query frag) (uri-decompose-hierarchical request-uri)
+    (let* ([path (uri-decode-string path :cgi-decode #t)]
+           [hdrs (rfc822-read-headers (socket-input-port csock))]
+           [host ($ rfc822-header-ref hdrs "host"
+                    $ sockaddr-name $ socket-getsockname csock)]
+           [req (make-request line csock method host path #f query hdrs)])
+      (unwind-protect
+          (match (find-handler path req app)
+            [(handler req) (handler req app)]
+            [_ (respond/ng req 404)])
+        ;; Clean temp files created by with-post-parameters
+        ;; NB: We can use a parameter, assuming one thread handles
+        ;; one request at a time.  If we introduce coroutines
+        ;; (a thread may switch handling requests), we need to avoid
+        ;; using cgi-temporary-files.
+        (for-each sys-unlink (cgi-temporary-files))))))
+
+(add-method-dispatcher! 'GET  %default-dispatch)
+(add-method-dispatcher! 'HEAD %default-dispatch)
+(add-method-dispatcher! 'POST %default-dispatch)
 
 ;;;
 ;;; Logging
