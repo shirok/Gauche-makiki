@@ -120,59 +120,53 @@
 ;;; Request packet
 ;;;
 
+;; Although many slots are mutable, most of them are set up before
+;; application handler is called, and should be treated immutable.
 (define-record-type request  %make-request #t
   ;; public slots
-  line                ; the first line of the request
+  line                ; request line
   socket              ; client socket
   remote-addr         ; remote address (sockaddr)
   method              ; request method (uppercase symbol)
-  server-host         ; request host
-  server-port         ; request port
-  path                ; request path
-  (path-rxmatch)      ; #<regmatch> object of matched path
-                      ;  This slot is mutable just so that find-handler
-                      ;  can reuse the same request record in case the guard
-                      ;  procedure rejects the match.  Handlers should treat
-                      ;  this field as read-only.
-  (guard-value)       ; the result of guard procedure.
-                      ;  set by dispatcher; handlers should treat this field
-                      ;  immutable.
-  query               ; unparsed query string
-  params              ; query parameters
-  headers             ; request headers
+  uri                 ; request uri
+  http-version        ; http version (string, e.g. "1.1")
+  server-host         ; request host (string)
+  server-port         ; request port (integer)
+  (path)              ; request path (string)
+  (path-rxmatch)      ; #<regmatch> object of matched path (set by dispatcher)
+  (guard-value)       ; the result of guard procedure (set by dispatcher)
+  (query)             ; query string as passed in the request
+  (params)            ; parsed query parameters
+  (headers)           ; request headers
   (response-error)    ; #f if response successfully sent, #<error> otherwise.
-                      ;  set by respond/* procedures.  The handler can check
-                      ;  this slot and take actions in case of an error.
+                      ;  set by respond/* procedures.
   ;; private slots
-  (cookies %request-cookies) ; promise of alist of parsed cookies
+  (cookies %request-cookies request-cookies-set!) ; promise of alist of parsed cookies
   (send-cookies)      ; alist of cookie spec (set by handler)
   (status)            ; result status (set by responder)
   (response-headers)  ; response headers (set by handler)
   (response-size))    ; size of reply content in octets (set by responder)
 
-(define-inline (make-request line socket method host:port path
-                             rxmatch query headers)
-  (rxmatch-let (#/^([^:]*)(?::(\d+))?$/ host:port) [_ h p]
-    (%make-request line socket (socket-getpeername socket) method
-                   h (if p (x->integer p) 80)
-                   path rxmatch #f (or query "")
-                   (cgi-parse-parameters :query-string (or query ""))
-                   headers #f
-                   (delay (%request-parse-cookies headers)) '()
-                   #f '() 0)))
+(define-inline (make-request request-line csock method request-uri
+                             http-vers headers)
+  (define host:port ($ rfc822-header-ref headers "host"
+                       $ sockaddr-name $ socket-getsockname csock))
+  (define-values (auth path query frag)
+    (uri-decompose-hierarchical request-uri))
+  (define-values (host port)
+    (if-let1 m (#/:(\d+)$/ host:port)
+      (values (m'before) (x->integer (m 1)))
+      (values host:port 80)))
+  (%make-request request-line csock (socket-getpeername csock)
+                 method request-uri http-vers host port
+                 (uri-decode-string path :cgi-decode #t) #f #f
+                 query (cgi-parse-parameters :query-string (or query ""))
+                 headers #f (delay (%request-parse-cookies headers))
+                 '() #f '() 0))
 
 (define-inline (make-ng-request msg socket)
-  (%make-request msg socket (socket-getpeername socket)
-                 "" "" 80 "" #f #f "" '() '() #f '() '() #f '() 0))
-
-;; e.g. (copy-request/subst req :params p) - returns a copy of req,
-;; except it's param slot is substituted by p.
-(define (copy-request/subst req . substs)
-  ($ apply %make-request
-     (map (^s (or (get-keyword (make-keyword (slot-definition-name s))
-                               substs #f)
-                  (slot-ref req (slot-definition-name s))))
-          (class-slots request))))
+  (%make-request msg socket (socket-getpeername socket) ""
+                 "" "" "" 80 "" #f #f "" '() '() #f '() '() #f '() 0))
 
 ;; API
 (define-inline (request-iport req) (socket-input-port (request-socket req)))
@@ -561,10 +555,12 @@
         [test eof-object?
          (respond/ng (make-ng-request "(empty request)" csock) 400
                      :no-response #t)]
-        [#/^(\w+)\s+(\S+)\s+HTTP\/\d+\.\d+$/ (_ meth request-uri)
-         (let1 method (string->symbol (string-upcase meth))
+        [#/^(\w+)\s+(\S+)\s+HTTP\/(\d+\.\d+)$/ (_ meth req-uri httpvers)
+         (let* ([method (string->symbol (string-upcase meth))]
+                [headers (rfc822-read-headers (socket-input-port csock))]
+                [req (make-request line csock method req-uri httpvers headers)])
            (if-let1 dispatcher (find-method-dispatcher method)
-             (dispatcher app csock line method request-uri)
+             (dispatcher req app)
              (respond/ng (make-ng-request #"[E] ~line" csock) 501)))]
         [else (respond/ng (make-ng-request #"[E] ~line" csock) 400)]))))
 
@@ -578,23 +574,17 @@
   (enqueue! *method-dispatchers* (cons meth proc)))
 
 ;; Default GET/HEAD/POST dispatcher
-(define (%default-dispatch app csock line method request-uri)
-  (receive (auth path query frag) (uri-decompose-hierarchical request-uri)
-    (let* ([path (uri-decode-string path :cgi-decode #t)]
-           [hdrs (rfc822-read-headers (socket-input-port csock))]
-           [host ($ rfc822-header-ref hdrs "host"
-                    $ sockaddr-name $ socket-getsockname csock)]
-           [req (make-request line csock method host path #f query hdrs)])
-      (unwind-protect
-          (match (find-handler path req app)
-            [(handler req) (handler req app)]
-            [_ (respond/ng req 404)])
-        ;; Clean temp files created by with-post-parameters
-        ;; NB: We can use a parameter, assuming one thread handles
-        ;; one request at a time.  If we introduce coroutines
-        ;; (a thread may switch handling requests), we need to avoid
-        ;; using cgi-temporary-files.
-        (for-each sys-unlink (cgi-temporary-files))))))
+(define (%default-dispatch req app)
+  (unwind-protect
+      (match (find-handler (request-path req) req app)
+        [(handler req) (handler req app)]
+        [_ (respond/ng req 404)])
+    ;; Clean temp files created by with-post-parameters
+    ;; NB: We can use a parameter, assuming one thread handles
+    ;; one request at a time.  If we introduce coroutines
+    ;; (a thread may switch handling requests), we need to avoid
+    ;; using cgi-temporary-files.
+    (for-each sys-unlink (cgi-temporary-files))))
 
 (add-method-dispatcher! 'GET  %default-dispatch)
 (add-method-dispatcher! 'HEAD %default-dispatch)
@@ -874,5 +864,5 @@
                            [#t '("REQUEST_METHOD" "POST")])]
                          [current-input-port (request-iport req)])
             (cgi-parse-parameters :part-handlers part-handlers))
-        (inner-handler (copy-request/subst req :params params) app))
+        (request-params-set! req params))
       (inner-handler req app))))
