@@ -117,5 +117,10 @@
            "<html><body><p>Yo, Keoki.  Howzit?</p></body></html>"
            (values-ref (http-get *server* "/?g=2&name=Keoki") 2))))
 
+(test-section "add-on modules")
+
+(use makiki.connect)
+(test-module 'makiki.connect)
+
 ;; epilogue
 (test-end)
