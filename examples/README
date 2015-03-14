@@ -10,3 +10,4 @@ upload -handling file upload
 
 session - session management
 
+proxy - rudimenal proxy server, showing usage of connect handler.
