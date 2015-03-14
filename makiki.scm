@@ -58,8 +58,8 @@
           access-log access-log-drain
           error-log error-log-drain
           add-method-dispatcher!
-          request?
-          request-socket request-iport request-oport request-method
+          request? request-socket request-iport request-oport
+          request-line request-method request-uri request-http-version
           request-server-host request-server-port
           request-path request-path-rxmatch request-guard-value
           request-response-error
