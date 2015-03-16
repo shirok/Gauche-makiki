@@ -4,11 +4,37 @@
 
 Gauche-makiki is a simple multithreded http server intended for
 applications that want to provide http server capability easily.
-At this moment, the only required file is `makiki.scm`, so you can
-either install it as an ordinary Gauche extension library, or you
-can just copy the file into your application.
+The main functionalities are available by just one file, `makiki.scm`,
+so you can either install it as an ordinary Gauche extension library,
+or you can just copy the file into your application.
 
-You need Gauche 0.9.3 or later to use Gauche-makiki.
+You need Gauche 0.9.4 or later to use Gauche-makiki.
+(Some examples need development HEAD of Gauche.)
+
+
+## Getting started
+
+You'll get the idea by looking at the [minimal server](examples/minimal.scm):
+
+    (use makiki)
+    (define (main args) (start-http-server :port 6789))
+    (define-http-handler "/"
+      (^[req app] (respond/ok req "<h1>It worked!</h1>")))
+
+Basically, you register a handler for a path (or a pattern for a path),
+and the server dispatches matching request to the handler, which is
+expected to return the content.
+
+The `req` argument holds the information of the request, and
+the `app` argument holds the application state you pass to
+`start-http-server`.  (The above example isn't using application
+state.  See [this BBS example](examples/query.scm) for simple
+usage of application state.)
+
+Gauche-makiki isn't an all-in-one framework; rather, we provide
+simple and orthogonal parts that can be combined together
+as needed.
+
 
 ## Handling requests
 
@@ -35,7 +61,8 @@ the server calls `HANDLER-PROC` with two arguments:
 
 `REQUEST` is a request record, explained below.
 `APP-DATA` is an application-specific data given at the time the server
-is started.
+is started.  Gauche-makiki treats `APP-DATA` as opaque data; it's
+solely up to the application how to use it.
 
 The optional `GUARD-PROC` is a procedure called right after the
 server finds the request path matches `PATTERN`.
@@ -54,14 +81,15 @@ of using a guard procedure and the request's `guard-value` slot.
 
 ### Request record
 
-Here's the request record passed to the handlers and guard procedures.
-Only public slots are shown.
+A request record passed to the handlers and guard procedures
+has the following slots (only public slots are shown):
 
-    (define-record-type request  %make-request #t
-      line                ; the first line of the request
+      line                ; request line
       socket              ; client socket  (#<socket>)
       remote-addr         ; remote address (sockaddr)
       method              ; request method (symbol in upper cases, e.g. GET)
+      uri                 ; request uri
+      http-version        ; requested version (e.g. "1.1")
       server-host         ; request host (string)
       server-port         ; request port (integer)
       path                ; request path (string, url decoded)
@@ -73,8 +101,6 @@ Only public slots are shown.
       (response-error)    ; #f if response successfully sent, #<error> otherwise.
                           ;  set by respond/* procedures.  The handler can check
                           ;  this slot and take actions in case of an error.
-      ...)
-
 
 The following convenience procedures are avaiable on the request record.
 
@@ -373,6 +399,14 @@ Finally, to start the server, call `start-http-server`.
     shutdown-callback - a thunk to be called after all the server operations
        are shut down.  If given, this is the last thing `start-http-server`
        does before returning.
+
+## Add-ons
+
+Some less frequently used features are provided in separate modules.
+
+* `makiki.connect`: Handling `CONNECT` http request.
+See [simple proxy example](examples/proxy.scm).
+
 
 ## Examples
 

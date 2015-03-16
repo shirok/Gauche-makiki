@@ -224,6 +224,7 @@
 ;;; Generating response
 ;;;
 
+;; this will be unnecessary after Gauche 0.9.5
 (define *status-code-map*
   (hash-table 'eqv?
               '(100 . "Continue")
