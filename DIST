@@ -16,7 +16,7 @@ while [ $# -gt 0 ]; do
 done
 
 if [ "$gen" = "yes" ]; then
-  autoconf
+  if [ -f configure.ac ]; then autoconf; fi
 fi
 
 if [ "$tgz" = "yes" ]; then

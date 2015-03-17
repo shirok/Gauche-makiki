@@ -45,7 +45,15 @@
 (cf-subst 'GAUCHE_PKGARCHDIR (gauche-config "--pkgarchdir"))
 
 ;; Output
-(cf-make-gpd)
+;(cf-make-gpd)  ; replace below with this after 0.9.5 release
+(use gauche.package)
+(let1 gpd-file #"~(cf$ 'PACKAGE_NAME).gpd"
+  (with-output-to-file gpd-file
+    (cut write-gauche-package-description
+      (make <gauche-package-description>
+        :name (cf$ 'PACKAGE_NAME)
+        :version (cf$ 'PACKAGE_VERSION)
+        :configure (string-join (command-line))))))
 (cf-echo (cf$ 'PACKAGE_VERSION) > "VERSION")
 (cf-output "Makefile")
 
