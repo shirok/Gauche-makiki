@@ -854,7 +854,7 @@
 ;; part-handlers are the same as cgi-parse-parameters
 (define (with-post-parameters inner-handler :key (part-handlers '()))
   (^[req app]
-    (if (eq? (request-method req) 'POST)
+    (when (eq? (request-method req) 'POST)
       (let1 params
           (parameterize ([cgi-metavariables
                           (cond-list
@@ -865,5 +865,5 @@
                            [#t '("REQUEST_METHOD" "POST")])]
                          [current-input-port (request-iport req)])
             (cgi-parse-parameters :part-handlers part-handlers))
-        (request-params-set! req params))
-      (inner-handler req app))))
+        (request-params-set! req params)))
+    (inner-handler req app)))
