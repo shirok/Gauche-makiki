@@ -48,7 +48,6 @@
   (use rfc.uri)
   (use rfc.mime)
   (use rfc.cookie)
-  (use rfc.json)
   (use text.html-lite)
   (use util.queue)
   (use util.match)
@@ -76,6 +75,8 @@
           with-header-handler with-post-parameters)
   )
 (select-module makiki)
+
+(autoload rfc.json construct-json-string)
 
 ;;;
 ;;; Some parameters
