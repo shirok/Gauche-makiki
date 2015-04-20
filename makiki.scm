@@ -73,6 +73,7 @@
           response-header-push! response-header-delete!
           response-header-replace!
           response-cookie-add! response-cookie-delete!
+          read-request-body
           define-http-handler add-http-handler!
           document-root
           file-handler file-mime-type
@@ -178,6 +179,21 @@
 
 ;; API
 (define-inline (request-oport req) (socket-output-port (request-socket req)))
+
+;; API
+;; Read request body into u8vector.  May return #f if request has no body.
+;; May return #<eof> if the body is already (partially) read.
+(define (read-request-body req)
+  (and-let* ([slen (request-header-ref req "content-length")]
+             [len (x->integer slen)]
+             [buf (make-u8vector len)])
+    (let loop ([nread 0])
+      (if (= nread len)
+        buf
+        (let1 n (read-uvector! buf (request-iport req) nread len)
+          (if (eof-object? n)
+            (eof-object)
+            (loop (+ nread n))))))))
 
 ;; some convenience accessors
 ;; API

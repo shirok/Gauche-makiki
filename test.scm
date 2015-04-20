@@ -27,6 +27,7 @@
     (unwind-protect (proc p)
       (process-kill p))))
 
+;;;
 (test-section "basic functionality")
 
 ($ call-with-server "tests/basic.scm"
@@ -50,6 +51,7 @@
                (socket-close s))))
     ))
 
+;;;
 (test-section "file-handler")
 
 ($ call-with-server "tests/file.scm"
@@ -67,6 +69,7 @@
     (file-test "tests/file-dummy.css" "text/css")
     ))
 
+;;;
 (test-section "cgi-handler and cgi-script")
 (use makiki.cgi)
 (test-module 'makiki.cgi)
@@ -93,6 +96,7 @@
 (test-cgi-stuff "tests/test-env1.scm")
 (test-cgi-stuff "tests/test-env2.scm")
 
+;;;
 (test-section "customized respond/ng body")
 
 ($ call-with-server "tests/customized-ng.scm"
@@ -111,6 +115,7 @@
            (receive (code hdrs body) (http-get *server* "/favicon.ico")
              (list code (rfc822-header-ref hdrs "content-type") body)))))
 
+;;;
 (test-section "sxml template")
 
 ($ call-with-server "tests/sxml-tmpl.scm"
@@ -119,10 +124,21 @@
            "<html><body><p>Yo, Keoki.  Howzit?</p></body></html>"
            (values-ref (http-get *server* "/?g=2&name=Keoki") 2))))
 
+;;;
+($ call-with-server "tests/json-server.scm"
+   (^p
+    (test* "json request/response" "{\"count\":0}"
+           (values-ref (http-get *server* "/") 2))
+    (test* "json request/response" "{\"count\":101}"
+           (values-ref (http-post *server* "/" "{\"count\":100}") 2))))
+
+;;;
 (test-section "add-on modules")
 
 (use makiki.connect)
 (test-module 'makiki.connect)
+
+
 
 ;; epilogue
 (test-end)
