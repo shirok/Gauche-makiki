@@ -1,4 +1,5 @@
 (use makiki)
+(use makiki.cgi)
 (use gauche.parseopt)
 
 (load "tests/env.scm")

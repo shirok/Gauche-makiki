@@ -68,6 +68,8 @@
     ))
 
 (test-section "cgi-handler and cgi-script")
+(use makiki.cgi)
+(test-module 'makiki.cgi)
 
 (define (test-cgi-stuff server-file)
   ($ call-with-server server-file

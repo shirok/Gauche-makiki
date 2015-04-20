@@ -1,4 +1,7 @@
 ;;;
+;;; makiki - a small http server
+;;;
+;;;
 ;;;   Copyright (c) 2010-2013 Shiro Kawai  <shiro@acm.org>
 ;;;
 ;;;   Redistribution and use in source and binary forms, with or without
@@ -58,6 +61,7 @@
           error-log error-log-drain
           add-method-dispatcher!
           request? request-socket request-iport request-oport
+          request-remote-addr request-query
           request-line request-method request-uri request-http-version
           request-server-host request-server-port
           request-path request-path-rxmatch request-guard-value
@@ -71,7 +75,7 @@
           response-cookie-add! response-cookie-delete!
           define-http-handler add-http-handler!
           document-root
-          file-handler file-mime-type cgi-handler cgi-script
+          file-handler file-mime-type
           with-header-handler with-post-parameters)
   )
 (select-module makiki)
@@ -641,7 +645,7 @@
 
 (define (logtime time) (date->string (time-utc->date time) "~4"))
 
-(define (logip addr)
+(define (logip addr) ; NB: probably this should be a feature in gauche.net!
   (inet-address->string (sockaddr-addr addr)
                         (case (sockaddr-family addr)
                           [(inet)  AF_INET]
@@ -657,103 +661,6 @@
 
 (define (logreferer req)
   (rfc822-header-ref (request-headers req) "referer" "-"))
-
-;;;
-;;; CGI adaptor
-;;;
-
-;; This can be used to call a cgi program's main procedure PROC,
-;; with setting cgi metavariables and current i/o's. 
-;; We don't support http authentications yet.
-;;
-;; SCRIPT-NAME should be an absolute path of the script that appear in
-;; URL.  That is, if you want to make the script invoked as
-;; http://example.com/foo/bar/baz.cgi, give "/foo/bar/baz.cgi".
-;; It is necessary to calculate PATH_INFO properly.
-
-(define (cgi-handler proc :key (script-name ""))
-  (^[req app]
-    (let1 out (open-output-string)
-      (with-input-from-port (request-iport req)
-        (^[]
-          (let1 r (parameterize ([cgi-metavariables
-                                  (get-cgi-metavariables req script-name)]
-                                 [current-output-port
-                                  (make <buffered-output-port>
-                                    :flush (^[v f] (write-block v out)
-                                                   (u8vector-length v)))])
-                    (unwind-protect (proc `(,script-name))
-                      (close-output-port (current-output-port))))
-            (if (zero? r)
-              (let* ([p    (open-input-string (get-output-string out))]
-                     [hdrs (rfc822-read-headers p)])
-                (dolist [h hdrs] (response-header-push! req (car h) (cadr h)))
-                (if-let1 location (rfc822-header-ref hdrs "location")
-                  (respond/redirect req location)
-                  (respond/ok req (get-remaining-input-string p)
-                              :content-type
-                              (rfc822-header-ref hdrs "content-type"))))
-              (respond/ng req 500))))))))
-
-;; Load file as a cgi script, and create a cgi handler that calls a
-;; procedure named by ENTRY-POINT inside the script.
-;; To avoid interference with makiki itself, the script is loaded
-;; into an anonymous module.
-;;
-;; See cgi-handler above for SCRIPT-NAME.  It's NOT the pathname to
-;; the cgi script file.
-;;
-;; Loading is done only once unless LOAD-EVERY-TIME is true.
-;; Usually, loading only once cuts the overhead of script loading for
-;; repeating requests.  However, if the cgi script sets some global
-;; state, it should be loaded for every request---a script can
-;; be executed concurrently, so any code relying on a shared mutable
-;; global state will fail.
-;; Note also that we assume the script itself isn't written inside
-;; a specific module; if it has it's own define-module and
-;; select-module, the module will be shared for every load, and
-;; we won't have enough isolation.
-(define (cgi-script file :key (entry-point 'main)
-                              (script-name "")
-                              (load-every-time #f))
-  (define (load-script) ;returns entry point procedure
-    (let1 mod (make-module #f)
-      (load file :environment mod)
-      (global-variable-ref mod entry-point)))
-
-  (if load-every-time
-    (^[req app]
-      ((cgi-handler (load-script) :script-name script-name) req app))
-    (cgi-handler (load-script) :script-name script-name)))
-     
-;; Sets up cgi metavariables.
-(define (get-cgi-metavariables req script-name)
-  (cond-list
-   ;; AUTH_TYPE - not supported yet
-   [(request-header-ref req "content-length")
-    => (^v (list "CONTENT_LENGTH" (x->string v)))]
-   [(request-header-ref req "content-type")
-    => (^v (list "CONTENT_LENGTH" (x->string v)))]
-   [#t `("GATEWAY_INTERFACE" "CGI/1.1")]
-   [#t `("PATH_INFO"
-         ,(if (string-prefix? script-name (request-path req))
-            (string-drop (request-path req)
-                         (string-prefix-length script-name (request-path req)))
-            (request-path req)))] ; not correct, but don't know what to do.
-   [#t `("PATH_TRANSLATED" ;todo - flexible path trans.
-         ,(string-append (document-root) (request-path req)))]
-   [#t `("QUERY_STRING" ,(request-query req))]
-   [#t `("REMOTE_ADDR" ,(logip (request-remote-addr req)))]
-   [#t `("REMOTE_HOST"  ,(request-remote-addr req))]
-   ;; REMOTE_IDENT - not supported
-   ;; REMOTE_USER - not supported
-   [#t `("REQUEST_METHOD" ,(x->string (request-method req)))]
-   [#t `("SCRIPT_NAME" ,script-name)]
-   [#t `("SERVER_NAME" ,(request-server-host req))]
-   [#t `("SERVER_PORT" ,(request-server-port req))]
-   [#t `("SERVER_PROTOCOL" "HTTP/1.1")]
-   [#t `("SERVER_SOFTWARE" ,(http-server-software))]
-   ))  
 
 ;;;
 ;;; Built-in file handler
