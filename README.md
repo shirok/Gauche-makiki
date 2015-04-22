@@ -363,7 +363,7 @@ Finally, to start the server, call `start-http-server`.
 
     (start-http-server :key host port document-root num-threads max-backlog
                             access-log error-log forwarded? app-data
-                            startup-callback shutdown-callback)
+                            startup-callback shutdown-callback user group)
 
 
     host (#f or string), port (integer) - Passed to make-server-sockets
@@ -399,6 +399,10 @@ Finally, to start the server, call `start-http-server`.
     shutdown-callback - a thunk to be called after all the server operations
        are shut down.  If given, this is the last thing `start-http-server`
        does before returning.
+
+    user and group - set effective user/group after creating sockets,
+       both name and id are accepted. This is usually used to drop root
+       privileges. user and group should be used together.
 
 ## Add-ons
 

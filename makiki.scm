@@ -521,7 +521,9 @@
                                 (forwarded? #f)
                                 (app-data #f)
                                 (startup-callback #f)
-                                (shutdown-callback #f))
+                                (shutdown-callback #f)
+                                (user #f)
+                                (group #f))
   ;; see initial-log-drain for the possible values of access-log and error-log.
   (parameterize ([access-log-drain (initial-log-drain alog 'access-log)]
                  [error-log-drain (initial-log-drain elog 'error-log)]
@@ -531,6 +533,21 @@
            [ssocks (make-server-sockets host port :reuse-addr? #t)])
       (unwind-protect
           (let1 sel (make <selector>)
+            ;; alog and elog must not be written before this or they
+            ;; could be created with root access and become unwritable
+            ;; after dropping root privileges
+            (if group
+                (let1 gid (cond
+                           [(number? group) group]
+                           [(string? group) (sys-group-name->gid group)]
+                           [else (error "invalid group " group)])
+                  (sys-setgid gid)))
+            (if user
+                (let1 uid (cond
+                           [(number? user) user]
+                           [(string? user) (sys-user-name->uid user)]
+                           [else (error "invalid user " user)])
+                  (sys-setuid uid)))
             (dolist [s ssocks]
               (selector-add! sel (socket-fd s)
                              (^[fd condition]
