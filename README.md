@@ -2,7 +2,7 @@
 
 ## Overview
 
-Gauche-makiki is a simple multithreded http server intended for
+Gauche-makiki is a simple multithreaded http server intended for
 applications that want to provide http server capability easily.
 The main functionalities are available by just one file, `makiki.scm`,
 so you can either install it as an ordinary Gauche extension library,
@@ -45,7 +45,7 @@ To use the server, you should define _http-handler_ using
 
     (define-http-handler PATTERN [? GUARD-PROC] HANDLER-PROC)
 
-Or, handlers can be added procedurally using `add-http-handler`:
+Or, handlers can be added procedurally using `add-http-handler!`:
 
     (add-http-handler! PATTERN HANDLER-PROC :optional GUARD-PROC)
 
@@ -73,7 +73,7 @@ another match instead.
 It is useful to refine the condition the handler is called.
 
 If the guard procedure returns a non-false value, it is stored in the
-`guard-value` slot of the request record, and avaible to the
+`guard-value` slot of the request record, and available to the
 handler procedure.
 See [examples/session.scm](examples/session.scm) for an example
 of using a guard procedure and the request's `guard-value` slot.
@@ -245,7 +245,7 @@ procedure that takes one argument, the pathname of the file, and it
 must return a mime-type in string, or `#f` to delegate the association
 to the makiki's default handler.
 
-    (docuement-root)
+    (document-root)
 
 A parameter that holds the current path of the document root (the one
 given to `start-http-server`; `"."` by default.)
