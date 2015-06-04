@@ -8,6 +8,6 @@ post - handling POST request
 
 upload -handling file upload
 
-session - session management
+session, session2 - session management
 
 proxy - rudimenal proxy server, showing usage of connect handler.
