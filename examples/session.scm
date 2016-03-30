@@ -41,12 +41,13 @@
                            (hash-table-delete! table key)))))
 
 (define (session-data req app)
-  (and-let* ([key (request-cookie-ref req "sess")])
-    ($ atomic app
-       (^[table]
-         (%sweep-session table)
-         (and-let* ([p (hash-table-get table (cadr key) #f)])
-           (cdr p))))))
+  (let-params req ([key "c:sess"])
+    (and key
+         ($ atomic app
+            (^[table]
+              (%sweep-session table)
+              (and-let* ([p (hash-table-get table key #f)])
+                (cdr p)))))))
 
 (define (session-create! req app data)
   ($ atomic app
@@ -58,9 +59,8 @@
          (response-cookie-add! req "sess" key :path "/")))))
 
 (define (session-delete! req app)
-  (and-let* ([key (request-cookie-ref req "sess")])
-    ($ atomic app
-       (^[table] (hash-table-delete! table (cadr key))))))
+  (let-params req ([key "c:sess"])
+    (and key (atomic app (^[table] (hash-table-delete! table key))))))
 
 ;; session-data :
 ;;  (#f . <path>)     - a non-logged-in client is trying to access <path>
@@ -117,8 +117,8 @@
    (^[req app]
      (match (request-guard-value req)
        [(and (#f . path) data)
-        (let ([u (request-param-ref req "user")]
-              [p (request-param-ref req "pass")])
+        (let-params req ([u "p:user"]
+                         [p "p:pass"])
           (if (equal? (assoc-ref *password-db* u) p)
             (begin
               (set! (car data) #t)

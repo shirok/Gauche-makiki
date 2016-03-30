@@ -21,8 +21,8 @@
 
 (define-http-handler "/"
   (^[req app]
-    (let ([name    (request-param-ref req "name")]
-          [message (request-param-ref req "message")])
+    (let-params req (name
+                     message)
       (when (and name message)
         (atomic-update! app (cut cons `(,name ,(sys-time) ,message) <>)))
       (respond/ok req (atomic app render-wall)))))

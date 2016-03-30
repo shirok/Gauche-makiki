@@ -34,8 +34,9 @@
 
 ;; Returns session-data (#f . path) or (#t . user), if it exists.
 (define (session-data req app)
-  (and-let1 cookie (request-cookie-ref req "sess")
-    (atomic app (^a (cache-lookup! (~ a'sessions) (cadr cookie) #f)))))
+  (let-params req ([cookie "c:sess"])
+    (and cookie
+         (atomic app (^a (cache-lookup! (~ a'sessions) cookie #f))))))
 
 ;; Returns username if the client has active session, #f otherwise.
 (define (check-login req app)
@@ -45,8 +46,9 @@
 
 ;; Delete session
 (define (session-delete! req app)
-  (and-let1 cookie (request-cookie-ref req "sess")
-    (atomic app (^a (cache-evict! (~ a'sessions) (cadr cookie))))))
+  (let-params req ([cookie "c:sess"])
+    (and cookie
+         (atomic app (^a (cache-evict! (~ a'sessions) cookie))))))
 
 ;; Create a new session
 (define (session-create! req app data)
@@ -99,8 +101,8 @@
    (^[req app]
      (match (request-guard-value req)
        [(and (#f . path) data)
-        (let ([u (request-param-ref req "user")]
-              [p (request-param-ref req "pass")])
+        (let-params req ([u "p:user"]
+                         [p "p:pass"])
           (if (equal? (assoc-ref *password-db* u) p)
             (begin
               (set! (car data) #t)
