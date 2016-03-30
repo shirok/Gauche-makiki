@@ -74,6 +74,7 @@
           response-header-replace!
           response-cookie-add! response-cookie-delete!
           read-request-body
+          let-params
           define-http-handler add-http-handler!
           document-root
           file-handler file-mime-type
@@ -240,6 +241,80 @@
 (define (response-cookie-delete! req name)
   (update! (request-send-cookies req)
            (cut remove (^e (equal? (car e) name)) <>)))
+
+;; API
+;; (let-request-params req ((var spec ...) ...) body ...)
+;; spec : [source] kv-list ...
+;; source is a string with the format "kind" or "kind:name".
+;; kind part is one-character indicating where the value is taken:
+;;   "p" - GET/POST params (default)
+;;   "r" - path-regexp match
+;;   "c" - cookie
+;;   "h" - header
+;; The optional name part specifies the name of the value; when
+;; omitted, the variable name is used.
+;; The following keys are recognized in kv-list:
+;;   :default   - default value.  if omitted, #f.
+;;   :convert   - proc applied to the string
+;;   :list      - if true, multiple value is allowed.
+;;
+(define-macro (let-params req bindings . body)
+  (define tmp-req (gensym))
+  (define tmp-unique (gensym))
+  (define (extractor var-spec)
+    (match var-spec
+      [((? symbol? var)) (kv param-extractor var #"~var" '())]
+      [(? symbol? var)   (kv param-extractor var #"~var" '())]
+      [((? symbol? var) (? string? spec) . kv-list)
+       (rxmatch-case spec
+         [#/^([prch])(?::(.+))?$/ (_ kind name)
+          (let1 name (or name #"~var")
+            (cond [(equal? kind "p") (kv param-extractor var name kv-list)]
+                  [(equal? kind "r") (kv path-extractor var name kv-list)]
+                  [(equal? kind "c") (kv cookie-extractor var name kv-list)]
+                  [(equal? kind "h") (kv header-extractor var name kv-list)]))]
+         [else (error "Bad source spec:" spec)])]
+      [_ (error "Invalid var-spec:" var-spec)]))
+  (define (kv proc var name args)
+    (let-keywords* args ([default #f] [convert #f] [list #f])
+      (proc var name default convert list)))
+  (define (param-extractor var name default cv lis?)
+    `[,var (request-param-ref ,tmp-req ,name
+                              ,@(cond-list [default @ `(:default ,default)]
+                                           [cv @ `(:convert ,cv)]
+                                           [lis? @ `(:list? ,lis?)]))])
+  (define (path-extractor var name default cv lis?)
+    (let ([matchname (if (#/^\d+$/ name)
+                       (x->integer name)
+                       `',(string->symbol name))]
+          [tmp (gensym)])
+      `[,var
+        ,(if cv
+           `(if-let1 ,tmp
+                (rxmatch-substring (request-path-rxmatch ,tmp-req) ,matchname)
+              (,cv ,tmp)
+              ,default)
+           `(or (rxmatch-substring (request-path-rxmatch ,tmp-req) ,matchname)
+                ,default))]))
+  (define (header-extractor var name default cv lis?)
+    (let1 tmp (gensym)
+      `[,var
+        ,(if cv
+           `(let1 ,tmp (request-header-ref ,tmp-req ,name ,tmp-unique)
+             (if (eq? ,tmp ,tmp-unique)
+               ,default
+               (,cv ,tmp)))
+           `(request-header-ref ,tmp-req ,name ,default))]))
+  (define (cookie-extractor var name default cv lis?)
+    (let1 tmp (gensym)
+      `[,var
+        (if-let1 ,tmp (request-cookie-ref ,tmp-req ,name)
+          ,(if cv `(,cv (cadr ,tmp)) `(cadr ,tmp))
+          ,default)]))
+  `(let ([,tmp-req ,req]
+         [,tmp-unique (cons #f #f)])
+     (let ,(map extractor bindings)
+       ,@body)))
 
 ;;;
 ;;; Generating response
@@ -511,6 +586,7 @@
 ;;;
 
 ;; API
+;; This procedure won't return until the server shuts down.
 (define (start-http-server :key (host #f)
                                 (port 8080)
                                 ((:document-root docroot) ".")

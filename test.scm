@@ -4,6 +4,7 @@
 
 (use gauche.test)
 (use gauche.process)
+(use gauche.parameter)
 (use gauche.net)
 (use rfc.http)
 (use rfc.822)
@@ -125,6 +126,8 @@
            (values-ref (http-get *server* "/?g=2&name=Keoki") 2))))
 
 ;;;
+(test-section "json")
+
 ($ call-with-server "tests/json-server.scm"
    (^p
     (test* "json request/response" "{\"count\":0}"
@@ -133,12 +136,33 @@
            (values-ref (http-post *server* "/" "{\"count\":100}") 2))))
 
 ;;;
+(test-section "let-params")
+
+(use rfc.cookie)
+
+($ call-with-server "tests/let-params.scm"
+   (^p
+    (define (req path . args)
+      (read-from-string (values-ref (apply http-get *server* path args) 2)))
+    (parameterize ([http-user-agent "makiki-test"])
+      (test* "let-params 1"
+             '("moo" doo "zoo" 123456 "makiki-test" #f #f -1)
+             (req "/zoo/foo-123456?param1=moo&poo=doo"))
+      (test* "let-params 2"
+             '(none #t "zoo" 654321 "makiki-test" (a b c) "coo" 4934)
+             (req "/zoo/foo-654321"
+                  :x-header2 "(a b c)"
+                  :cookie "cookie1=coo;cookie2=4934"))
+      )))
+
+;;;
 (test-section "add-on modules")
 
 (use makiki.connect)
 (test-module 'makiki.connect)
 
-
+(use makiki.cgi)
+(test-module 'makiki.cgi)
 
 ;; epilogue
 (test-end)
