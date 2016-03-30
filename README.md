@@ -115,8 +115,10 @@ The following convenience procedures are avaiable on the request record.
                             ; Retrieve request query-string parameter with
                             ; PARAM-NAME.  KEYS are a keyward-value list
                             ; passed to cgi-get-parameter in www.cgi.
+                            ; See also `let-params` below for easier access.
     (request-header-ref REQ HEADER-NAME :optional (DEFAULT #f))
                             ; retrieve the value from the request headers.
+                            ; See also `let-params` below for easier access.
     (request-cookies REQ)   ; returns parsed cookie list (see rfc.cookie)
                             ; in the request.
     (request-cookie-ref REQ COOKIE-NAME :optional (DEFAULT #f))
@@ -125,6 +127,7 @@ The following convenience procedures are avaiable on the request record.
                             ; is the result of `parse-cookie-string` of
                             ; `rfc.cookie`, i.e.
                             ; `(<name> <value> <cookie-parameters> ...)`
+                            ; See also `let-params` below for easier access.
 
 The handler procedure can set/modify response headers using
 the following procedures.
@@ -137,6 +140,94 @@ the following procedures.
 
 (NB: `response-cookie-delete!` merely removes the named cookie form
 the response message; it does not remove the cookie from the client.)
+
+
+### Accessing parameters passed by client
+
+It is often the case that the server needs to generate the content
+based on parameters clients provide.  Those parameters can come from
+several different sources; most commonly via query parameters in url
+or form-encoded in POST body, but can also be via request path
+component (often the case in REST API) or sometimes via cookies
+or even via request headers.   The `let-params` macro provides
+an easy and convenient way to access those parameters.
+
+    (let-params REQ (VAR-SPEC ...) BODY ...)
+
+`REQ` should be the request record.  Each `VAR-SPEC` specify
+a variable and its source, in one of the following forms:
+
+    (var source kv-args ...)
+    (var)
+    var
+
+Where `var` is a symbol (variable name), `source` is a string,
+and `kv-args` is keyword-value list.  This form extracts parameters
+according to `source` and binds its value to `var`, then executes
+`body` ....  The latter two forms are a shorthand for `(var "q")`.
+
+The `source` string can have either `<kind>:<name>` or just `<kind>`,
+where `<kind>` is a single character specifying where the value
+should be taken.
+
+    q  - Query parameters
+    p  - Path regexp matches
+    c  - Cookies
+    h  - Request headers
+
+The optional `<name>` part specifies the parameter's name as sent
+from the client, e.g. query name, cookie name or header name.
+For path regexp match, `<name>` can be a word for named subgroup,
+or an integer for unnamed subgroups.  If `<name>` is omitted, the
+name of `var` is assumed.
+
+The following keyword arguments are accepted in `kv-args`.
+
+    :default <value>    Specifies the default value when the
+                        parameter isn't provided from the client.
+                        The default default value is `#f`, except
+                        for the list query parameters, in which case
+                        the default default value is `()`.
+
+    :convert <proc>     Specifies the converter procedure `<proc>`,
+                        which should take a string and convert
+                        it to suitable type of object.  Note:
+                        if the value isn't provided, `<proc>`
+                        is never called and the default value is
+                        directly used.
+
+    :list <flag>        This is only effective for query parameters.
+                        If `<flag>` is a true value, the client
+                        can specify multiple instances of the same
+                        name of query parameters, and all the values
+                        are gathered to a list.  If `:convert` is
+                        also given, the convert procedure is applied
+                        to each value.  If `:default` is also given,
+                        its value is only used when there's no
+                        parameter for this name is provided.
+
+Suppose you have in the following code:
+
+    (define-http-handler #/^\/resource\/(\d+)\/edit$/
+      (^[req app]
+        (let-params req ([name        "q"]
+                         [comment     "q:c"]
+                         [resource-id "p:1" :convert x->integer]
+                         [sess        "c:sessionid"])
+          ...)))
+
+And if the client sends this request:
+
+     http://..../resource/33525/edit?name=foo&c=bar%20baz
+
+Then the code gets `name` to be bound to `"foo"`, `comment` to
+be bound to `"c"`, `resource-id` to be bound to 33525.  (`Sess`
+would depend on whether the client send a cookie for `"sessionid"`.)
+
+Of course, the client can send query parameters via POST, but in
+that case, the server needs to use `with-post-parameters` (see below)
+to fold the parameters in the request body into `request-params`
+for `let-params` to process them.
 
 
 ### Response
