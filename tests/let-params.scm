@@ -9,10 +9,10 @@
 
 (define-http-handler #/^\/(?<path1>\w+)\/foo-(\d+)/
   (^[req app]
-    (let-params req ([param1 "p" :default 'none]
-                     [param2 "p:poo" :convert string->symbol :default #t]
-                     [path1  "r"]
-                     [path2  "r:2" :convert x->integer]
+    (let-params req ([param1 "q" :default 'none]
+                     [param2 "q:poo" :convert string->symbol :default #t]
+                     [path1  "p"]
+                     [path2  "p:2" :convert x->integer]
                      [header1 "h:user-agent"]
                      [header2 "h:x-header2" :convert read-from-string]
                      [cookie1 "c"]

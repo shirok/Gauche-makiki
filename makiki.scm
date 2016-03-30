@@ -247,8 +247,8 @@
 ;; spec : [source] kv-list ...
 ;; source is a string with the format "kind" or "kind:name".
 ;; kind part is one-character indicating where the value is taken:
-;;   "p" - GET/POST params (default)
-;;   "r" - path-regexp match
+;;   "q" - Query params (default)
+;;   "p" - path-regexp match
 ;;   "c" - cookie
 ;;   "h" - header
 ;; The optional name part specifies the name of the value; when
@@ -267,10 +267,10 @@
       [(? symbol? var)   (kv param-extractor var #"~var" '())]
       [((? symbol? var) (? string? spec) . kv-list)
        (rxmatch-case spec
-         [#/^([prch])(?::(.+))?$/ (_ kind name)
+         [#/^([qpch])(?::(.+))?$/ (_ kind name)
           (let1 name (or name #"~var")
-            (cond [(equal? kind "p") (kv param-extractor var name kv-list)]
-                  [(equal? kind "r") (kv path-extractor var name kv-list)]
+            (cond [(equal? kind "q") (kv param-extractor var name kv-list)]
+                  [(equal? kind "p") (kv path-extractor var name kv-list)]
                   [(equal? kind "c") (kv cookie-extractor var name kv-list)]
                   [(equal? kind "h") (kv header-extractor var name kv-list)]))]
          [else (error "Bad source spec:" spec)])]

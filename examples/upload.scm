@@ -40,7 +40,7 @@
 (define-http-handler "/upload"
   (with-post-parameters
    (^[req app]
-     (let-params req ([tnames "p:files" :list #t])
+     (let-params req ([tnames "q:files" :list #t])
        ($ respond/ok req
           `(sxml
             (html

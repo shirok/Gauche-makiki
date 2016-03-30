@@ -101,8 +101,8 @@
    (^[req app]
      (match (request-guard-value req)
        [(and (#f . path) data)
-        (let-params req ([u "p:user"]
-                         [p "p:pass"])
+        (let-params req ([u "q:user"]
+                         [p "q:pass"])
           (if (equal? (assoc-ref *password-db* u) p)
             (begin
               (set! (car data) #t)
