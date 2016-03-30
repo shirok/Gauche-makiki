@@ -282,7 +282,7 @@
     `[,var (request-param-ref ,tmp-req ,name
                               ,@(cond-list [default @ `(:default ,default)]
                                            [cv @ `(:convert ,cv)]
-                                           [lis? @ `(:list? ,lis?)]))])
+                                           [lis? @ `(:list ,lis?)]))])
   (define (path-extractor var name default cv lis?)
     (let ([matchname (if (#/^\d+$/ name)
                        (x->integer name)
