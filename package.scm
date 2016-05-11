@@ -1,0 +1,10 @@
+(define-gauche-package "Gauche-makiki"
+  :version "0.1"
+  :description "Simple multithreaded http server"
+  :require (("Gauche" (>= "0.9.4")))
+  :maintainers ("shiro@acm.org")
+  :authors ("Shiro Kawai <shiro@acm.org>")
+  :homepage "http://github.com/shirok/Gauche-makiki"
+  :repository "https://github.com/shirok/Gauche-makiki"
+  :licenses ("BSD")
+  )

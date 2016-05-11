@@ -20,7 +20,7 @@
 
 ;; Initialize configure.  This creates the global context, parses
 ;; command-line args and sets up default values.
-(cf-init "Gauche-makiki" "0.1" "nobody@example.org")
+(cf-init "Gauche-makiki" "0.1" "shiro@acm.org")
 
 ;; Set up gauche related commands.  The commands are set by scanning
 ;; PATH.  You can override them by "GOSH=/my/gosh ./configure" etc.
@@ -45,15 +45,24 @@
 (cf-subst 'GAUCHE_PKGARCHDIR (gauche-config "--pkgarchdir"))
 
 ;; Output
-;(cf-make-gpd)  ; replace below with this after 0.9.5 release
-(use gauche.package)
-(let1 gpd-file #"~(cf$ 'PACKAGE_NAME).gpd"
-  (with-output-to-file gpd-file
-    (cut write-gauche-package-description
-      (make <gauche-package-description>
-        :name (cf$ 'PACKAGE_NAME)
-        :version (cf$ 'PACKAGE_VERSION)
-        :configure (string-join (command-line))))))
+;; TODO: Gauche-0.9.4 doesn't have cf-make-gpd.  Replace it after
+;; releasing Gauche-0.9.5
+(if (global-variable-bound? (find-module 'gauche.configure) 'cf-make-gpd)
+  (cf-make-gpd)
+  (begin
+    (use gauche.process)
+    (use gauche.package)
+    (let1 gpd-file #"~(cf$ 'PACKAGE_NAME).gpd"
+      (cf-echo #"creating ~gpd-file")
+      (with-output-to-file gpd-file
+        (cut write-gauche-package-description
+             (make <gauche-package-description>
+               :name (cf$ 'PACKAGE_NAME)
+               :version (cf$ 'PACKAGE_VERSION)
+               :configure ($ string-join $ cons "./configure"
+                             $ map shell-escape-string
+                             $ cdr $ command-line)))))))
+
 (cf-echo (cf$ 'PACKAGE_VERSION) > "VERSION")
 (cf-output "Makefile")
 
