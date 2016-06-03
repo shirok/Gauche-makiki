@@ -452,7 +452,7 @@ of `start-http-server` described below.
 
 Finally, to start the server, call `start-http-server`.
 
-    (start-http-server :key host port document-root num-threads max-backlog
+    (start-http-server :key host port path document-root num-threads max-backlog
                             access-log error-log forwarded? app-data
                             startup-callback shutdown-callback)
 
@@ -460,6 +460,10 @@ Finally, to start the server, call `start-http-server`.
     host (#f or string), port (integer) - Passed to make-server-sockets
        of gauche.net to open the server socket.  The default values are
        #f and 8080.
+
+    path (#f or string) - If a string is given, it specifies the path to
+       a Unix-domain socket on which the server listens.  In that case
+       `host` and `port` arguments are ignored.
 
     document-root - used to specify the root of the document served
        by file-handler.  The default is the process's working directory.

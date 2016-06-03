@@ -589,6 +589,7 @@
 ;; This procedure won't return until the server shuts down.
 (define (start-http-server :key (host #f)
                                 (port 8080)
+                                (path #f) ; unix domain
                                 ((:document-root docroot) ".")
                                 (num-threads 5)
                                 (max-backlog 10)
@@ -604,7 +605,9 @@
                  [document-root docroot])
     (let* ([pool (tpool:make-thread-pool num-threads :max-backlog max-backlog)]
            [tlog (kick-logger-thread pool forwarded?)]
-           [ssocks (make-server-sockets host port :reuse-addr? #t)])
+           [ssocks (if path
+                     (list (make-server-socket 'unix path))
+                     (make-server-sockets host port :reuse-addr? #t))])
       (unwind-protect
           (let1 sel (make <selector>)
             (dolist [s ssocks]
@@ -620,6 +623,7 @@
         (for-each %socket-discard ssocks)
         (tpool:terminate-all! pool :force-timeout 300)
         (thread-terminate! tlog)
+        (when path (sys-unlink path)) ; remove socket
         (when shutdown-callback (shutdown-callback))))))
 
 (define (kick-logger-thread pool forwarded?)
@@ -738,11 +742,11 @@
 (define (logtime time) (date->string (time-utc->date time) "~4"))
 
 (define (logip addr) ; NB: probably this should be a feature in gauche.net!
-  (inet-address->string (sockaddr-addr addr)
-                        (case (sockaddr-family addr)
-                          [(inet)  AF_INET]
-                          [(inet6) AF_INET6]
-                          [else AF_INET]))) ;just in case
+  (case (sockaddr-family addr)
+    [(unix) "unix-socket"]
+    [(inet)  (inet-address->string (sockaddr-addr addr) AF_INET)]
+    [(inet6) (inet-address->string (sockaddr-addr addr) AF_INET6)]
+    [else (x->string addr)]))
 
 (define (logdt t0 t1)
   (let1 dt (time-difference t1 t0)
