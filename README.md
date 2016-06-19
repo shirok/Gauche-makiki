@@ -350,6 +350,7 @@ automatically, based on the the timestamp of the file.
 There's an experimental support to call a CGI script written
 in Gauche.  Instead of spawning a child process, we load
 Gauche program and call its main routine "in process".
+You have to `(use makiki.cgi)` to use this feature.
 
     (cgi-script FILE :key ENTRY-POINT SCRIPT-NAME LOAD-EVERY-TIME)
 
@@ -522,6 +523,8 @@ Some less frequently used features are provided in separate modules.
 
 * `makiki.connect`: Handling `CONNECT` http request.
 See [simple proxy example](examples/proxy.scm).
+
+* `makiki.cgi` : Handling CGI scripts.
 
 
 ## Examples
