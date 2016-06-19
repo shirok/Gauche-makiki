@@ -28,6 +28,16 @@
     (unwind-protect (proc p)
       (process-kill p))))
 
+(define (call-with-server/exit-status path proc)
+  (let ((p (run-process `(gosh "-I." ,path "--port" ,*port*)
+                        :output :pipe :error :pipe :wait #f)))
+    (let1 msg (read-line (process-error p))
+      (unless (#/started/ msg)
+        (errorf "failed to start server script ~s: ~a" path msg)))
+    (proc p)
+    (process-wait p)
+    (sys-wait-exit-status (process-exit-status p))))
+
 ;;;
 (test-section "basic functionality")
 
@@ -154,6 +164,17 @@
                   :x-header2 "(a b c)"
                   :cookie "cookie1=coo;cookie2=4934"))
       )))
+
+;;;
+(test-section "server termination")
+
+(test* "/a" 1
+       ($ call-with-server/exit-status "tests/termination.scm"
+          (^_ (http-get *server* "/a"))))
+
+(test* "/b" 2
+       ($ call-with-server/exit-status "tests/termination.scm"
+          (^_ (http-get *server* "/b"))))
 
 ;;;
 (test-section "add-on modules")

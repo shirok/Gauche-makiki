@@ -448,7 +448,7 @@ The destination of logs are set by the keyword arguments
 of `start-http-server` described below.
 
 
-## Starting the server
+## Starting and terminating the server
 
 Finally, to start the server, call `start-http-server`.
 
@@ -494,6 +494,27 @@ Finally, to start the server, call `start-http-server`.
     shutdown-callback - a thunk to be called after all the server operations
        are shut down.  If given, this is the last thing `start-http-server`
        does before returning.
+
+Note that `start-http-server` enters the server loop and won't return
+by default.  If you called `start-http-server` from the main thread,
+sending a signal (e.g. `SIGINT`) to the process would break the
+server loop.  If you want to terminate the server gracefully, though,
+you can call `terminate-server-loop` *within the http handler*.
+
+    (terminate-server-loop REQUEST EXIT-CODE)
+
+Calling this function causes `start-http-server` to break the server
+loop, does cleaning up (including finishing request that are already
+being processed), and returns EXIT-CODE.
+
+You can pass any object to EXIT-CODE, but the supposed way to call
+`start-http-server` is the tail position of the `main` function; in
+that case, EXIT-CODE becomes the exit code of the server.
+
+    (define (main args)
+       ...
+       (start-http-server ...))
+
 
 ## Add-ons
 
