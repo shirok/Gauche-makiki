@@ -455,7 +455,8 @@ Finally, to start the server, call `start-http-server`.
 
     (start-http-server :key host port path document-root num-threads max-backlog
                             access-log error-log forwarded? app-data
-                            startup-callback shutdown-callback)
+                            startup-callback shutdown-callback
+                            control-channel)
 
 
     host (#f or string), port (integer) - Passed to make-server-sockets
@@ -513,6 +514,8 @@ by default.  There are two ways to shut down the server loop.
   the server loop to shutdown, call `terminate-server-loop` with the
   control channel.  See below for further description.  See
   [this test code](tests/termination.scm) as an example.
+
+
 
     (make-server-control-channel)
 
