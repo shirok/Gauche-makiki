@@ -496,17 +496,35 @@ Finally, to start the server, call `start-http-server`.
        are shut down.  If given, this is the last thing `start-http-server`
        does before returning.
 
+    control-channel - an opaque object, through which you can request
+       the server loop to shutdown.  See `make-server-control-channel` and
+       `terminate-server-loop` below.
+
 Note that `start-http-server` enters the server loop and won't return
-by default.  If you called `start-http-server` from the main thread,
-sending a signal (e.g. `SIGINT`) to the process would break the
-server loop.  If you want to terminate the server gracefully, though,
-you can call `terminate-server-loop` *within the http handler*.
+by default.  There are two ways to shut down the server loop.
 
-    (terminate-server-loop REQUEST EXIT-CODE)
+* Send `SIGINT` or `SIGTERM`.  By default, signals sent to a Gauche process
+  is handled by the main thread.  So if you called `start-http-server`
+  in the main thread, this is the easiest way.
+* If you run `start-http-server` outside of the main thread, or don't want
+  to rely on signals, you need a bit of setup.  (1) Create a server control
+  channel by `make-server-control-channel` and pass it to `:control-channel`
+  argument of the `start-http-server`.  (2) When you want to request
+  the server loop to shutdown, call `terminate-server-loop` with the
+  control channel.  See below for further description.  See
+  [this test code](tests/termination.scm) as an example.
 
-Calling this function causes `start-http-server` to break the server
-loop, does cleaning up (including finishing request that are already
-being processed), and returns EXIT-CODE.
+    (make-server-control-channel)
+
+Returns an opaque object through which you can request the server loop to
+shut down.   You need one channel for each server loop, if you have more
+than one loop.
+
+    (terminate-server-loop CHANNEL EXIT-CODE)
+
+Calling this function causes `start-http-server` that has CHANNEL
+to break the loop, does cleaning up (including finishing request that are
+already being processed), and returns EXIT-CODE.
 
 You can pass any object to EXIT-CODE, but the supposed way to call
 `start-http-server` is the tail position of the `main` function; in

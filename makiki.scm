@@ -60,6 +60,7 @@
           access-log access-log-drain
           error-log error-log-drain
           add-method-dispatcher!
+          make-server-control-channel
           terminate-server-loop
           request? request-socket request-iport request-oport
           request-remote-addr request-query
@@ -582,26 +583,26 @@
                     (list (caddr entry) req)))
                 *handlers*))
 
-;; Throwing this condition from a handler would cause the main thread
-;; to exit the loop and return from start-http-server.  Exit-value
-;; will be the return value of start-http-server (which is intended to
-;; be the exit code, but the application can use it as it suits.)
-(define-condition-type <makiki-termination> <condition> #f
-  (exit-value #f))
-
-;; API.  Should be called in the handler.
-;; We don't use REQ for now, but it may come handy (and it reminds the
-;; caller that this should be called within the handler).
-(define (terminate-server-loop req exit-value)
-  (raise (condition (<makiki-termination> (exit-value exit-value)))))
+;; API
+;; Create a server control channel, through which you can terminate
+;; the server.  The implementation detail may change; the user must treat
+;; this as an opaque object.
+(define (make-server-control-channel)
+  (receive (t-in t-out) (sys-pipe)
+    (^[msg]
+      (case msg
+        [(get-channel) t-in]
+        [(request-termination) (newline t-out)]))))
 
 ;; Queue to hold exit-value.  NB: Only the first exit-value of the
 ;; queue is considered.  We use mtqueue merely to avoid race condition.
 (define exit-value-queue (make-parameter #f))
 
-;; Pipe to communicate between main thread and the worker thread requested
-;; termination.
-(define termination-signal-pipe (make-parameter #f))
+;; API
+;; Request termination of the server loop
+(define (terminate-server-loop control-channel exit-value)
+  #?=(enqueue! (exit-value-queue) exit-value)
+  #?=(control-channel 'request-termination))
 
 ;;;
 ;;; Main loop
@@ -619,15 +620,14 @@
                                 ((:error-log elog) #f)
                                 (forwarded? #f)
                                 (app-data #f)
+                                (control-channel #f)
                                 (startup-callback #f)
                                 (shutdown-callback #f))
-  (define-values (t-in t-out) (sys-pipe)) ; for termination signal pipe
   ;; see initial-log-drain for the possible values of access-log and error-log.
   (parameterize ([access-log-drain (initial-log-drain alog 'access-log)]
                  [error-log-drain (initial-log-drain elog 'error-log)]
                  [document-root docroot]
-                 [exit-value-queue (make-mtqueue)]
-                 [termination-signal-pipe t-out])
+                 [exit-value-queue (make-mtqueue)])
     (let* ([pool (tpool:make-thread-pool num-threads :max-backlog max-backlog)]
            [tlog (kick-logger-thread pool forwarded?)]
            [ssocks (if path
@@ -645,10 +645,10 @@
                    (^[fd condition]
                      (accept-client app-data (socket-accept s) pool))
                    '(r)))
-              ;; This is called when a worker thread requested termination
-              (selector-add! sel t-in
-                             (^[fd condition] (set! looping #f))
-                             '(r))
+              (when control-channel
+                (selector-add! sel (control-channel 'get-channel)
+                               (^[fd condition] (set! looping #f))
+                               '(r)))
               (when startup-callback (startup-callback ssocks))
               (access-log "started on ~a"
                           (map (.$ sockaddr-name socket-address) ssocks))
@@ -677,13 +677,7 @@
     (%socket-discard csock)))
 
 (define (handle-client app csock)
-  (guard (e [<makiki-termination>
-             (access-log "Termination requested (code=~a)" (~ e'exit-value))
-             (enqueue! (exit-value-queue) (~ e'exit-value))
-             (display "\n" (termination-signal-pipe))
-             (respond/ng (make-ng-request "(server termination)" csock) 200
-                         :body "Server terminated")]
-            [else
+  (guard (e [else
              ;; As of Gauche-0.9.4, there's an issue that report-error prints
              ;; nothing when called in a thread.  You need HEAD version of
              ;; Gauche to get stack dump.
