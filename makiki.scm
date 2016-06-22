@@ -634,30 +634,35 @@
                      (list (make-server-socket 'unix path))
                      (make-server-sockets host port :reuse-addr? #t))]
            [looping #t])
-      (unwind-protect
-          (let1 sel (make <selector>)
-            (dolist [s ssocks]
-              (selector-add! sel (socket-fd s)
-                             (^[fd condition]
-                               (accept-client app-data (socket-accept s) pool))
-                             '(r)))
-            ;; This is called when a worker thread requested termination
-            (selector-add! sel t-in
-                           (^[fd condition] (set! looping #f))
-                           '(r))
-            (when startup-callback (startup-callback ssocks))
-            (access-log "started on ~a"
-                        (map (.$ sockaddr-name socket-address) ssocks))
-            (while looping (selector-select sel))
-            (if (queue-empty? (exit-value-queue))
-              0
-              (dequeue! (exit-value-queue))))
-        (access-log "Server terminating...")
-        (for-each %socket-discard ssocks)
-        (tpool:terminate-all! pool :force-timeout 300)
-        (thread-terminate! tlog)
-        (when path (sys-unlink path)) ; remove socket
-        (when shutdown-callback (shutdown-callback))))))
+      (guard (e [(and (<unhandled-signal-error> e)
+                      (memv (~ e'signal) `(,SIGINT ,SIGTERM)))
+                 (access-log "Shutdown by signal ~a" (~ e'signal))]
+                [else (raise e)])
+        (unwind-protect
+            (let1 sel (make <selector>)
+              (dolist [s ssocks]
+                ($ selector-add! sel (socket-fd s)
+                   (^[fd condition]
+                     (accept-client app-data (socket-accept s) pool))
+                   '(r)))
+              ;; This is called when a worker thread requested termination
+              (selector-add! sel t-in
+                             (^[fd condition] (set! looping #f))
+                             '(r))
+              (when startup-callback (startup-callback ssocks))
+              (access-log "started on ~a"
+                          (map (.$ sockaddr-name socket-address) ssocks))
+              ;; Main loop
+              (while looping (selector-select sel))
+              (if (queue-empty? (exit-value-queue))
+                0
+                (dequeue! (exit-value-queue))))
+          (access-log "Server terminating...")
+          (for-each %socket-discard ssocks)
+          (tpool:terminate-all! pool :force-timeout 300)
+          (thread-terminate! tlog)
+          (when path (sys-unlink path)) ; remove unix socket
+          (when shutdown-callback (shutdown-callback)))))))
 
 (define (kick-logger-thread pool forwarded?)
   (thread-start! (make-thread (cut logger pool forwarded?))))
