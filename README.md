@@ -516,6 +516,7 @@ by default.  There are two ways to shut down the server loop.
   [this test code](tests/termination.scm) as an example.
 
 
+Here's the API for controlling the server loop.
 
     (make-server-control-channel)
 
