@@ -601,8 +601,8 @@
 ;; API
 ;; Request termination of the server loop
 (define (terminate-server-loop control-channel exit-value)
-  #?=(enqueue! (exit-value-queue) exit-value)
-  #?=(control-channel 'request-termination))
+  (enqueue! (exit-value-queue) exit-value)
+  (control-channel 'request-termination))
 
 ;;;
 ;;; Main loop
