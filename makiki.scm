@@ -2,7 +2,7 @@
 ;;; makiki - a small http server
 ;;;
 ;;;
-;;;   Copyright (c) 2010-2013 Shiro Kawai  <shiro@acm.org>
+;;;   Copyright (c) 2010-2016 Shiro Kawai  <shiro@acm.org>
 ;;;
 ;;;   Redistribution and use in source and binary forms, with or without
 ;;;   modification, are permitted provided that the following conditions
@@ -177,10 +177,8 @@
   (%make-request msg socket (socket-getpeername socket) ""
                  "" "" "" 80 "" #f #f "" '() '() #f '() '() #f '() 0))
 
-;; API
+;; APIs
 (define-inline (request-iport req) (socket-input-port (request-socket req)))
-
-;; API
 (define-inline (request-oport req) (socket-output-port (request-socket req)))
 
 ;; API
@@ -199,24 +197,16 @@
             (loop (+ nread n))))))))
 
 ;; some convenience accessors
-;; API
+;; APIs
 (define (request-param-ref req param-name . keys)
   (apply cgi-get-parameter param-name (request-params req) keys))
-
-;; API
 (define (request-header-ref req header-name :optional (default #f))
   (rfc822-header-ref (request-headers req) header-name default))
-
-;; API
 (define (response-header-push! req header-name value)
   (push! (request-response-headers req) (list header-name value)))
-
-;; API
 (define (response-header-delete! req header-name)
   (update! (request-response-headers req)
            (cut remove (^e (equal? (car e) header-name)) <>)))
-
-;; API
 (define (response-header-replace! req header-name value)
   (response-header-delete! req header-name)
   (response-header-push! req header-name value))
@@ -227,19 +217,13 @@
                            (rfc822-header-ref headers "cookie2")
                            "")))
 
-;; API
+;; APIs
 (define (request-cookies req) (force (%request-cookies req)))
-
-;; API
 (define (request-cookie-ref req name :optional (default #f))
   (or (assoc name (request-cookies req)) default))
-
-;; API
 (define (response-cookie-add! req name value . options)
   (response-cookie-delete! req name)
   (push! (request-send-cookies req) `(,name ,value ,@options)))
-
-;; API
 (define (response-cookie-delete! req name)
   (update! (request-send-cookies req)
            (cut remove (^e (equal? (car e) name)) <>)))
@@ -408,10 +392,10 @@
               [(pair? content) (dolist [chunk (cdr content)] (p chunk))]))
       (flush port))))
 
-;; Handle 'body' argument for respond/ok to respond/ng.  Returns
+;; Handle 'body' argument for respond/ok and respond/ng.  Returns
 ;; content-type and <content>.  If content-type arg is #f, we assume
 ;; the default content type, according to the BODY form.  Note that
-;; 'file' body may ranse an condition 404 if the file doesn't exist.
+;; 'file' body may raise an condition 404 if the file doesn't exist.
 ;;
 ;; Supported forms:
 ;;  <string>
