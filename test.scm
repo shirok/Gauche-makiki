@@ -126,6 +126,14 @@
            (receive (code hdrs body) (http-get *server* "/favicon.ico")
              (list code (rfc822-header-ref hdrs "content-type") body)))))
 
+($ call-with-server "tests/customized-ng.scm"
+   (^p
+    (test* "request-error condition"
+           '("400" "application/json; charset=utf-8"
+             "{\"message\":\"boo!\"}")
+           (receive (code hdrs body) (http-get *server* "/request-error")
+             (list code (rfc822-header-ref hdrs "content-type") body)))))
+
 ;;;
 (test-section "sxml template")
 

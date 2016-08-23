@@ -20,3 +20,8 @@
   (^[req app]
     (respond/ng req 404 :body '(file "no favicon!"))))
 
+;; A handler can throw <request-error> condition, which should be translated
+;; to respond/ng.
+(define-http-handler "/request-error"
+  (^[req app]
+    (request-error :status 400 :body '(json (("message" . "boo!"))))))

@@ -71,6 +71,7 @@
           request-params  request-param-ref
           request-headers request-header-ref
           request-cookies request-cookie-ref
+          <request-error> request-error
           respond/ng respond/ok respond/redirect
           response-header-push! response-header-delete!
           response-header-replace!
@@ -176,6 +177,14 @@
 (define-inline (make-ng-request msg socket)
   (%make-request msg socket (socket-getpeername socket) ""
                  "" "" "" 80 "" #f #f "" '() '() #f '() '() #f '() 0))
+
+;; API
+;; The handler can throw this condition to respond to the client
+(define-condition-type <request-error> <error> #f
+  (status) (body) (content-type))
+(define (request-error :key (status 400) (body #f) (content-type #f))
+  (error <request-error> :status status :body body :content-type content-type
+         (x->string body)))
 
 ;; APIs
 (define-inline (request-iport req) (socket-input-port (request-socket req)))
@@ -684,7 +693,11 @@
                 [headers (rfc822-read-headers (socket-input-port csock))]
                 [req (make-request line csock method req-uri httpvers headers)])
            (if-let1 dispatcher (find-method-dispatcher method)
-             (dispatcher req app)
+             (guard (e [(<request-error> e)
+                        (respond/ng req (~ e'status) :body (~ e'body)
+                                    :content-type (~ e'content-type))]
+                       [else (raise e)])
+               (dispatcher req app))
              (respond/ng (make-ng-request #"[E] ~line" csock) 501)))]
         [else (respond/ng (make-ng-request #"[E] ~line" csock) 400)]))))
 
