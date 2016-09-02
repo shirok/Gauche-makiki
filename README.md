@@ -43,11 +43,16 @@ as needed.
 To use the server, you should define _http-handler_ using
 `define-http-handler` macro:
 
-    (define-http-handler PATTERN [? GUARD-PROC] HANDLER-PROC)
+    (define-http-handler [METHODS] PATTERN [? GUARD-PROC] HANDLER-PROC)
 
 Or, handlers can be added procedurally using `add-http-handler!`:
 
-    (add-http-handler! PATTERN HANDLER-PROC :optional GUARD-PROC)
+    (add-http-handler! PATTERN HANDLER-PROC :optional GUARD-PROC METHODS)
+
+`METHODS` is a list of symbols (`GET`, `POST`, etc.) that this handler
+accepts.  You can define different handler with the same `PATTERN`
+as far as `METHODS` don't overlap.   When omitted,
+`(GET HEAD POST)` is assumed.
 
 `PATTERN` can be a regexp or a string.
 

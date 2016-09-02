@@ -56,7 +56,27 @@
            (let1 s (make-client-socket 'inet "localhost" *port*)
              (unwind-protect
                  (begin
-                   (display "PUT /foo.txt HTTP/1.1\r\n" (socket-output-port s))
+                   (display "ZZZZ /foo.txt HTTP/1.1\r\n" (socket-output-port s))
+                   (socket-shutdown s SHUT_WR)
+                   (read-line (socket-input-port s)))
+               (socket-close s))))
+    ))
+
+;;;
+(test-section "request methods")
+
+($ call-with-server "tests/methods.scm"
+   (^p
+    (test* "GET"    "get"    (values-ref (http-get *server* "/") 2))
+    (test* "POST"   "post"   (values-ref (http-post *server* "/" "") 2))
+    (test* "PUT"    "put"    (values-ref (http-put *server* "/" "") 2))
+    (test* "DELETE" "delete" (values-ref (http-delete *server* "/") 2))
+    
+    (test* "OPTIONS" "HTTP/1.1 404 Not Found"
+           (let1 s (make-client-socket 'inet "localhost" *port*)
+             (unwind-protect
+                 (begin
+                   (display "OPTIONS / HTTP/1.1\r\n" (socket-output-port s))
                    (socket-shutdown s SHUT_WR)
                    (read-line (socket-input-port s)))
                (socket-close s))))

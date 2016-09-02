@@ -533,7 +533,10 @@
 ;;
 ;; Handlers can be registered by define-http-handler:
 ;;
-;;   (define-http-handler pattern [? guard] handler)
+;;   (define-http-handler [(method ...)] pattern [? guard] handler)
+;;
+;; METHOD is a symbol (GET, POST, etc.) that this handler accepts.  If omitted,
+;; (GET HEAD POST) is assumed.
 ;;
 ;; PATTERN is regexp or string.
 ;; GUARD is a procedure :: Request App -> Boolean.
@@ -553,28 +556,39 @@
 ;; API
 (define-syntax define-http-handler
   (syntax-rules (?)
-    [(_ pattern ? guard handler) (add-http-handler! pattern handler guard)]
-    [(_ pattern handler) (add-http-handler! pattern handler)]))
+    [(_ (m ...) pattern ? guard handler)
+     (add-http-handler! pattern handler guard '(m ...))]
+    [(_ (m ...) pattern handler)
+     (add-http-handler! pattern handler #f '(m ...))]
+    [(_ pattern ? guard handler)
+     (add-http-handler! pattern handler guard #f)]
+    [(_ pattern handler)
+     (add-http-handler! pattern handler #f #f)]))
 
 ;; API
-(define (add-http-handler! pattern handler :optional (guard (^[m a] #t)))
-  (let1 rx (cond [(regexp? pattern) pattern]
-                 [(string? pattern)
-                  ($ string->regexp
-                     $ string-append "^" (regexp-quote pattern) "$")]
-                 [else (error "pattern must be a regexp or a string, but got"
-                              pattern)])
-    (enqueue! *handlers* (list rx guard handler))))
+(define (add-http-handler! pattern handler :optional (guard #f) (methods #f))
+  (let ([guard (or guard (^[m a] #t))]
+        [methods (or methods '(GET HEAD POST))]
+        [rx (cond [(regexp? pattern) pattern]
+                  [(string? pattern)
+                   ($ string->regexp
+                      $ string-append "^" (regexp-quote pattern) "$")]
+                  [else (error "pattern must be a regexp or a string, but got"
+                               pattern)])])
+    (enqueue! *handlers* (list methods rx guard handler))))
 
 ;; returns (handler req)
 (define (find-handler path req app)
-  (any-in-queue (^[entry]
-                  (and-let* ([m ((car entry) path)]
-                             [g (begin (request-path-rxmatch-set! req m)
-                                       ((cadr entry) req app))])
-                    (request-guard-value-set! req g)
-                    (list (caddr entry) req)))
-                *handlers*))
+  (let1 method (request-method req)
+    (any-in-queue (^[entry]
+                    (match-let1 (methods rx guard handler) entry
+                      (and-let* ([ (memq method methods) ]
+                                 [m (rx path)]
+                                 [g (begin (request-path-rxmatch-set! req m)
+                                           (guard req app))])
+                        (request-guard-value-set! req g)
+                        (list handler req))))
+                  *handlers*)))
 
 ;; API
 ;; Create a server control channel, through which you can terminate
@@ -710,7 +724,7 @@
 (define (add-method-dispatcher! meth proc)
   (enqueue! *method-dispatchers* (cons meth proc)))
 
-;; Default GET/HEAD/POST/OPTIONS dispatcher
+;; Default dispatcher
 (define (%default-dispatch req app)
   (unwind-protect
       (match (find-handler (request-path req) req app)
@@ -723,10 +737,8 @@
     ;; using cgi-temporary-files.
     (for-each sys-unlink (cgi-temporary-files))))
 
-(add-method-dispatcher! 'GET  %default-dispatch)
-(add-method-dispatcher! 'HEAD %default-dispatch)
-(add-method-dispatcher! 'POST %default-dispatch)
-(add-method-dispatcher! 'OPTIONS %default-dispatch)
+(dolist [m '(GET HEAD POST PUT DELETE OPTIONS)]
+  (add-method-dispatcher! m %default-dispatch))
 
 ;;;
 ;;; Logging
