@@ -710,7 +710,7 @@
 (define (add-method-dispatcher! meth proc)
   (enqueue! *method-dispatchers* (cons meth proc)))
 
-;; Default GET/HEAD/POST dispatcher
+;; Default GET/HEAD/POST/OPTIONS dispatcher
 (define (%default-dispatch req app)
   (unwind-protect
       (match (find-handler (request-path req) req app)
@@ -726,6 +726,7 @@
 (add-method-dispatcher! 'GET  %default-dispatch)
 (add-method-dispatcher! 'HEAD %default-dispatch)
 (add-method-dispatcher! 'POST %default-dispatch)
+(add-method-dispatcher! 'OPTIONS %default-dispatch)
 
 ;;;
 ;;; Logging
