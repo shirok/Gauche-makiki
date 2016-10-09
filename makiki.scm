@@ -48,6 +48,7 @@
   (use text.tree)
   (use file.util)
   (use rfc.822)
+  (use rfc.http)
   (use rfc.uri)
   (use rfc.mime)
   (use rfc.cookie)
@@ -315,52 +316,6 @@
 ;;; Generating response
 ;;;
 
-;; this will be unnecessary after Gauche 0.9.5
-(define *status-code-map*
-  (hash-table 'eqv?
-              '(100 . "Continue")
-              '(101 . "Switching Protocols")
-              '(200 . "OK")
-              '(201 . "Created")
-              '(202 . "Accepted")
-              '(203 . "Non-Authoritative Information")
-              '(204 . "No Content")
-              '(205 . "Reset Content")
-              '(206 . "Partial Content")
-              '(300 . "Multiple Choices")
-              '(301 . "Moved Permanently")
-              '(302 . "Found")
-              '(303 . "See Other")
-              '(304 . "Not Modified")
-              '(305 . "Use Proxy")
-              '(306 . "(Unused)")
-              '(307 . "Temporary Redirect")
-              '(400 . "Bad Request")
-              '(401 . "Unauthorized")
-              '(402 . "Payment Required")
-              '(403 . "Forbidden")
-              '(404 . "Not Found")
-              '(405 . "Method Not Allowed")
-              '(406 . "Not Acceptable")
-              '(407 . "Proxy Authentication Required")
-              '(408 . "Request Timeout")
-              '(409 . "Conflict")
-              '(410 . "Gone")
-              '(411 . "Length Required")
-              '(412 . "Precondition Failed")
-              '(413 . "Request Entity Too Large")
-              '(414 . "Request-URI Too Long")
-              '(415 . "Unsupported Media Type")
-              '(416 . "Requested Range Not Satisfiable")
-              '(417 . "Expectation Failed")
-              '(500 . "Internal Server Error")
-              '(501 . "Not Implemented")
-              '(502 . "Bad Gateway")
-              '(503 . "Service Unavailable")
-              '(504 . "Gateway Timeout")
-              '(505 . "HTTP Version Not Supported")
-              ))
-
 ;; <content> : <chunk> | (<size> <chunk> ...)
 ;; <chunk>   : <string> | <u8vector>
 ;;
@@ -376,7 +331,7 @@
            [(pair? content) (car content)]
            [else (error "invalid response content:" content)]))
   (let ([port (request-oport req)]
-        [desc (hash-table-get *status-code-map* code "")])
+        [desc (or (http-status-code->description code) "")])
     (define (p x) (if (u8vector? x) (write-block x port) (display x port)))
     (define (crlf) (display "\r\n" port))
     (guard (e [(and (<system-error> e) (eqv? (~ e'errno) EPIPE))
@@ -473,10 +428,10 @@
                       (respond/ng req 500)])
         (receive (content-type content)
             ($ %response-body content-type
-               (or body (hash-table-get *status-code-map* code "")) #f)
+               (or body (http-status-code->description code) "") #f)
           (%respond req code content-type content)))
       (%respond req code "text/plain; charset=utf-8"
-                (hash-table-get *status-code-map* code ""))))
+                (or (http-status-code->description code) ""))))
   (unless (and keepalive (not no-response))
     (%socket-discard (request-socket req)))
   req)
@@ -685,16 +640,7 @@
 
 (define (handle-client app csock)
   (guard (e [else
-             ;; As of Gauche-0.9.4, there's an issue that report-error prints
-             ;; nothing when called in a thread.  You need HEAD version of
-             ;; Gauche to get stack dump.
-             ;; We'll change report-error to take optional port argument by
-             ;; 0.9.5 release.  Once done,
-             ;; This can be just
-             ;; (call-with-output-string (cut report-error e <>))
-             (let1 trace (call-with-output-string
-                           (^o (with-error-to-port o
-                                 (cut report-error e))))
+             (let1 trace (call-with-output-string (cut report-error e <>))
                (error-log "handle-client error ~s\n~a" (~ e'message) trace))
              (respond/ng (make-ng-request #"[E] ~(~ e'message)" csock) 500)])
     (let1 line (read-line (socket-input-port csock))

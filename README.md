@@ -8,8 +8,7 @@ The main functionalities are available by just one file, `makiki.scm`,
 so you can either install it as an ordinary Gauche extension library,
 or you can just copy the file into your application.
 
-You need Gauche 0.9.4 or later to use Gauche-makiki.
-(Some examples need development HEAD of Gauche.)
+You need Gauche 0.9.5 or later to use Gauche-makiki.
 
 
 ## Getting started
