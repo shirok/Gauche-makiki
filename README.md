@@ -316,6 +316,12 @@ defaulted by 400.  The `body` and `content-type` arguments are
 the same as in `respond/ok` and `respond/ng`.  This is useful to
 abort the processing of a request deep in the stack.
 
+For example, you can return an error message in JSON form to the
+client as follows:
+
+    (unless (parameter-is-valid?)
+      (request-error :body `(json (("message" . "Invalid parameter")))))
+
 If you raise an unhandled condition other than `<request-error>` from
 the handler, it is captured by makiki and the client receives
 `500 Internal Server Error` response, and the error itself is logged
