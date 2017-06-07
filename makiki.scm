@@ -82,7 +82,9 @@
           define-http-handler add-http-handler!
           document-root
           file-handler file-mime-type
-          with-header-handler with-post-parameters)
+          with-header-handler with-post-parameters
+          with-profiling-handler
+          profiler-output)
   )
 (select-module makiki)
 
@@ -95,6 +97,7 @@
 (define document-root (make-parameter "."))
 (define http-server-software (make-parameter "gauche/makiki"))
 (define file-mime-type (make-parameter (^[path] #f)))
+(define profiler-output (make-parameter (sys-getenv "MAKIKI_PROFILER_OUTPUT")))
 
 ;;;
 ;;; Logging
@@ -657,9 +660,31 @@
                         (respond/ng req (~ e'status) :body (~ e'body)
                                     :content-type (~ e'content-type))]
                        [else (raise e)])
-               (dispatcher req app))
+               (dispatch-worker dispatcher req app))
              (respond/ng (make-ng-request #"[E] ~line" csock) 501)))]
         [else (respond/ng (make-ng-request #"[E] ~line" csock) 400)]))))
+
+(define (dispatch-worker dispatcher req app)
+  (if-let1 prof-out (profiler-output)
+    (with-profiling-handler prof-out dispatcher)
+    (dispatcher req app)))
+
+(define with-profiling-handler
+  (let1 mutex (make-mutex)
+    (^[prof-out handler]
+      (^[req app]
+        (let1 out (open-output-string)
+          (begin0 ($ with-output-to-port out
+                     (cut with-profiler (cut handler req app)))
+            (with-locking-mutex mutex
+              (^[] (with-output-to-file prof-out
+                     (^[]
+                       (format #t "~a: ~a\n"
+                               (logtime (current-time))
+                               (request-path req))
+                       (display (get-output-string out))
+                       (newline))
+                     :if-exists :append)))))))))
 
 (define *method-dispatchers* (make-mtqueue))
 

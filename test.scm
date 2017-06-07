@@ -205,6 +205,29 @@
           (^_ (http-get *server* "/b"))))
 
 ;;;
+(test-section "profiling")
+
+(define *profiler.out* "profiler.out")
+
+(unwind-protect
+    (^[]
+      (test* "profile output" #t
+             (begin
+               (sys-unlink *profiler.out*)
+               ($ call-with-server "tests/profiler.scm"
+                  (^_ (http-get *server* "/profile")))
+               (and (file-exists? *profiler.out*)
+                    (> (file-size *profiler.out*) 0))))
+      (test* "profile output" #f
+             (begin
+               (sys-unlink *profiler.out*)
+               ($ call-with-server "tests/profiler.scm"
+                  (^_ (http-get *server* "/noprofile")))
+               (and (file-exists? *profiler.out*)
+                    (> (file-size *profiler.out*) 0)))))
+  (sys-unlink *profiler.out*))
+
+;;;
 (test-section "add-on modules")
 
 (use makiki.connect)
