@@ -461,7 +461,7 @@ PART-HANDLERS specifies how to handle each parameter is handled
 according to its name.  By default, all parameter values are
 read into strings.  However, you might not want that behavior if
 you're accepting large file updates.  See the documentation of
-[`www.cgi`] (http://practical-scheme.net/gauche/man/?p=www.cgi) module
+[`www.cgi`](http://practical-scheme.net/gauche/man/?p=www.cgi) module
 for the meaning of PART-HANDLERS.
 
 
@@ -511,7 +511,7 @@ which thread the sampling picks---the profiling is recorded per thread,
 but the sampling timer is shared.  Make sure to issne one request
 at a time during profiling.
 
-See the [Using profiler] (http://practical-scheme.net/gauche/man/?p=Using+profiler) section of the Gauche reference manual
+See the [Using profiler](http://practical-scheme.net/gauche/man/?p=Using+profiler) section of the Gauche reference manual
 for the details of Gauche's built-in profiler.
 
 
