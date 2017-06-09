@@ -465,7 +465,9 @@ you're accepting large file updates.  See the documentation of
 for the meaning of PART-HANDLERS.
 
 
-## Logging
+## Logging and tuning
+
+### Logging
 
 If you write out logs inside an http handler, you can use those
 macros:
@@ -476,6 +478,41 @@ macros:
 FMT and ARGS are the same as `log-format` in `gauche.logger`.
 The destination of logs are set by the keyword arguments
 of `start-http-server` described below.
+
+### Profiling
+
+You can run Gauche's built-in sampling profiler during handling
+a request.  There are two ways to do it.
+
+If the environment variable `MAKIKI_PROFILER_OUTPUT` is set
+when `makiki.scm` is loaded, Makiki automatically profiles all
+handlers.  The value of `MAKIKI_PROFILER_OUTPUT` is used as a
+filename to which the profiling result is written out.  If the
+file already exists, the result is appended.  Each result is preceded
+by the request path.
+
+Alternatively, you can selectively profile specific handlers
+by wrapping the handler with `with-profiling-handler`:
+
+    (with-post-parameters OUTPUT-FILE INNER-HANDLER)
+
+This returns a procedure suitable to be a handler.  When called,
+it runs `INNER-HANDLER` with profiler running, and then write out
+the result to `OUTPUT-FILE`.   When `OUTPUT-FILE` already exists,
+the result is appended.
+
+You should use either one of the above method, but not both; 
+`MAKIKI_PROFILER_OUTPUT` tries to profile every handler, even it
+is already wrapped by `with-post-parameters`.
+
+Note: If multiple handlers run simultaneously in multiple threads,
+the profiling result becomes less reliable, for you don't know
+which thread the sampling picks---the profiling is recorded per thread,
+but the sampling timer is shared.  Make sure to issne one request
+at a time during profiling.
+
+See the [Using profiler] (http://practical-scheme.net/gauche/man/?p=Using+profiler) section of the Gauche reference manual
+for the details of Gauche's built-in profiler.
 
 
 ## Starting and terminating the server
