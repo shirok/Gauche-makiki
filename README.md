@@ -338,7 +338,7 @@ the following handler definition serves files under `document-root`:
     (define-http-handler "/"  (file-handler))
 
 Some handler-builders takes another handler procedure and returns
-a new handler that auguments the original handler.  
+a new handler that augments the original handler.  
 
 See [examples](examples/) for more usages.
 
@@ -387,7 +387,7 @@ Loads the cgi script in FILE, and creates and returns a cgi handler that
 calls a procedure named by ENTRY-POINT inside the script (`main` by default).
 
 To avoid interference with makiki itself, the script is loaded
-into an anonymous module.  
+into an independent, anonymous module.  
 
 Loading is done only once unless LOAD-EVERY-TIME is true.
 Usually, loading only once cuts the overhead of script loading for
