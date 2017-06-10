@@ -225,7 +225,7 @@ And if the client sends this request:
      http://..../resource/33525/edit?name=foo&c=bar%20baz
 
 Then the code gets `name` to be bound to `"foo"`, `comment` to
-be bound to `"c"`, `resource-id` to be bound to 33525.  (`Sess`
+be bound to `"bar"`, `resource-id` to be bound to 33525.  (`Sess`
 would depend on whether the client send a cookie for `"sessionid"`.)
 
 Of course, the client can send query parameters via POST, but in
