@@ -488,18 +488,18 @@ If the environment variable `MAKIKI_PROFILER_OUTPUT` is set
 when `makiki.scm` is loaded, Makiki automatically profiles all
 handlers.  The value of `MAKIKI_PROFILER_OUTPUT` is used as a
 filename to which the profiling result is written out.  If the
-file already exists, the result is appended.  Each result is preceded
+file already exists, the result is appended to it.  Each result is preceded
 by the request path.
 
 Alternatively, you can selectively profile specific handlers
 by wrapping the handler with `with-profiling-handler`:
 
-    (with-post-parameters OUTPUT-FILE INNER-HANDLER)
+    (with-profiling-handler OUTPUT-FILE INNER-HANDLER)
 
 This returns a procedure suitable to be a handler.  When called,
 it runs `INNER-HANDLER` with profiler running, and then write out
 the result to `OUTPUT-FILE`.   When `OUTPUT-FILE` already exists,
-the result is appended.
+the result is appended to it.
 
 You should use either one of the above method, but not both; 
 `MAKIKI_PROFILER_OUTPUT` tries to profile every handler, even it
