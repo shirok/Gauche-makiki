@@ -784,11 +784,12 @@
 ;; API
 (define (file-handler :key (directory-index '("index.html" #t))
                            (path-trans request-path)
-                           (root (document-root)))
+                           (root #f))
   (^[req app] (%handle-file req directory-index root path-trans)))
 
 (define (%handle-file req dirindex root path-trans)
-  (let1 rpath (sys-normalize-pathname (path-trans req) :canonicalize #t)
+  (let ([root (or root (document-root))]
+        [rpath (sys-normalize-pathname (path-trans req) :canonicalize #t)])
     (if (or (string-prefix? "/../" rpath)
             (string=? "/.." rpath))
       (respond/ng req 403)      ;do not allow path traversal
