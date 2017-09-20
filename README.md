@@ -350,13 +350,25 @@ procedure suitable for define-http-handler to return a file
 on the server.
 
     (file-handler :key (directory-index '("index.html" #t))
-                       (path-trans request-path))
+                       (path-trans request-path)
+                       (root (document-root)))
 
 `PATH-TRANS` should be a procedure that takes `REQUEST` and returns
 the server-side file path.  The returned path should start from
 slash, and the document-root directory passed to the start-http-server
 is prepended to it.  It is not allowed to go above the document
 root directory by `"/../../.."` etc---403 error message would results.
+
+If you need to access files other than document-root, you can specify
+alternative root directory by the `ROOT` keyword argument.
+
+The `DIRECTORY-INDEX` keyword argument specifies the behavior when
+given path is a directory.  It must be a list of either filename or
+`#t`.  The list is examined from left to right; if it is a filename,
+and the named file exists in the directory, the content of the file
+is returned.  If it is a filename but does not exist, next element
+is examined.  If it is `#t`, the list of the entries in the directory
+is returned.
 
 Makiki uses some heuristics to determine `content-type` of the file,
 but that's far from complete.   You can use a parameter `file-mime-type`
@@ -508,7 +520,7 @@ is already wrapped by `with-post-parameters`.
 Note: If multiple handlers run simultaneously in multiple threads,
 the profiling result becomes less reliable, for you don't know
 which thread the sampling picks---the profiling is recorded per thread,
-but the sampling timer is shared.  Make sure to issne one request
+but the sampling timer is shared.  Make sure to issue one request
 at a time during profiling.
 
 See the [Using profiler](http://practical-scheme.net/gauche/man/?p=Using+profiler) section of the Gauche reference manual

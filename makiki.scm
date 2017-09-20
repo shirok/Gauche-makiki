@@ -783,15 +783,16 @@
 
 ;; API
 (define (file-handler :key (directory-index '("index.html" #t))
-                           (path-trans request-path))
-  (^[req app] (%handle-file req directory-index path-trans)))
+                           (path-trans request-path)
+                           (root (document-root)))
+  (^[req app] (%handle-file req directory-index root path-trans)))
 
-(define (%handle-file req dirindex path-trans)
+(define (%handle-file req dirindex root path-trans)
   (let1 rpath (sys-normalize-pathname (path-trans req) :canonicalize #t)
     (if (or (string-prefix? "/../" rpath)
             (string=? "/.." rpath))
       (respond/ng req 403)      ;do not allow path traversal
-      (let1 fpath (sys-normalize-pathname #"~(document-root)~rpath")
+      (let1 fpath (sys-normalize-pathname #"~|root|~rpath")
         (cond [(file-is-readable? fpath)
                ($ response-header-push! req "Last-modified"
                   (date->string ($ time-utc->date
