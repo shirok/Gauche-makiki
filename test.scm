@@ -171,7 +171,14 @@
     (test* "json request/response" "{\"count\":0}"
            (values-ref (http-get *server* "/") 2))
     (test* "json request/response" "{\"count\":101}"
-           (values-ref (http-post *server* "/" "{\"count\":100}") 2))))
+           (values-ref (http-post *server* "/" "{\"count\":100}") 2))
+    (test* "json request/response (bad body)"
+           '("400" #/^invalid json/)
+           (receive (code hdrs body)
+               (http-post *server* "/" "[bad")
+             (list code body))
+           (^[a b] (and (equal? (car a) (car b))
+                        ((cadr a) (cadr b)))))))
 
 ;;;
 (test-section "let-params")

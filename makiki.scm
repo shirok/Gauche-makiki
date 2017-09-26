@@ -82,13 +82,13 @@
           define-http-handler add-http-handler!
           document-root
           file-handler file-mime-type
-          with-header-handler with-post-parameters
+          with-header-handler with-post-parameters with-post-json
           with-profiling-handler
           profiler-output)
   )
 (select-module makiki)
 
-(autoload rfc.json construct-json-string)
+(autoload rfc.json construct-json-string parse-json-string <json-parse-error>)
 
 ;;;
 ;;; Some parameters
@@ -892,3 +892,22 @@
             (cgi-parse-parameters :part-handlers part-handlers))
         (request-params-set! req params)))
     (inner-handler req app)))
+
+;; API
+(define (with-post-json inner-handler :key (on-error #f))
+  (^[req app]
+    (if (eq? (request-method req) 'POST)
+      (let* ([body (read-request-body req)]
+             [json (and body
+                        (u8vector? body)
+                        (guard (e [(<json-parse-error> e)
+                                   (if on-error
+                                     (on-error req app e)
+                                     (request-error
+                                      :status 400
+                                      :body #"invalid json: ~(~ e'message)"))])
+                          (parse-json-string (u8vector->string body))))])
+        (request-params-set! req `(("json-body" ,json) ,@(request-params req)))
+        (inner-handler req app))
+      (inner-handler req app))))
+  
