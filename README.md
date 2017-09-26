@@ -1,5 +1,31 @@
 # About Gauche-makiki
 
+## Table of contents
+
+      * [Overview](#overview)
+      * [Getting started](#getting-started)
+      * [Handling requests](#handling-requests)
+         * [Registering handlers](#registering-handlers)
+         * [Request record](#request-record)
+         * [Accessing parameters passed by client](#accessing-parameters-passed-by-client)
+         * [Handling POST/PUT request body](#handling-postput-request-body)
+            * [Form encoded data](#form-encoded-data)
+            * [Json](#json)
+            * [Retrieving raw body](#retrieving-raw-body)
+            * [Roll your own reader](#roll-your-own-reader)
+         * [Response](#response)
+         * [Errors and response](#errors-and-response)
+      * [Built-in handlers](#built-in-handlers)
+         * [Serving files](#serving-files)
+         * [Calling CGI scripts](#calling-cgi-scripts)
+         * [Modifying headers](#modifying-headers)
+      * [Logging and tuning](#logging-and-tuning)
+         * [Logging](#logging)
+         * [Profiling](#profiling)
+      * [Starting and terminating the server](#starting-and-terminating-the-server)
+      * [Add-ons](#add-ons)
+      * [Examples](#examples)
+
 ## Overview
 
 Gauche-makiki is a simple multithreaded http server intended for
@@ -148,9 +174,14 @@ the response message; it does not remove the cookie from the client.)
 
 ### Accessing parameters passed by client
 
-It is often the case that the server needs to generate the content
-based on parameters clients provide.  Those parameters can come from
-several different sources; most commonly via query parameters in url
+After a handler is selected according to the request url and method,
+query parameters in the url is parsed and saved in `request-params`.
+(Note: Parameters passed via `POST` request body are not
+parsed automatically; see *Handling POST request body* below.)
+
+It is ofen the case that the server needs to look at several
+different places to see what parameters the client prodives;
+most commonly they are passed via query parameters in url
 or form-encoded in POST body, but can also be via request path
 component (often the case in REST API) or sometimes via cookies
 or even via request headers.   The `let-params` macro provides
@@ -228,10 +259,82 @@ Then the code gets `name` to be bound to `"foo"`, `comment` to
 be bound to `"bar"`, `resource-id` to be bound to 33525.  (`Sess`
 would depend on whether the client send a cookie for `"sessionid"`.)
 
-Of course, the client can send query parameters via POST, but in
-that case, the server needs to use `with-post-parameters` (see below)
-to fold the parameters in the request body into `request-params`
-for `let-params` to process them.
+### Handling POST/PUT request body
+
+A query string in a request url is automatically parsed and
+accessible via `request-query`, `request-params` and `request-param-ref`,
+but the parameters passed via POST/PUT body aren't processed by default.
+
+#### Form encoded data
+
+The following procedure returns a handler that parses POST request body
+and put the parsed result to `request-params`:
+
+    (with-post-parameters INNER-HANDLER :key PART-HANDLERS)
+
+It can handle the body with both `multipart/form-data` and
+`application/x-www-form-urlencoded` content types.
+
+The REQUEST structure the INNER-HANDLER receives got parsed parameters
+(If the original request also has a query string in url, that will be
+overwritten.)
+
+PART-HANDLERS specifies how to handle each parameter is handled
+according to its name.  By default, all parameter values are
+read into strings.  However, you might not want that behavior if
+you're accepting large file updates.  See the documentation of
+[`www.cgi`](http://practical-scheme.net/gauche/man/?p=www.cgi) module
+for the meaning of PART-HANDLERS.
+
+#### Json
+
+For Web APIs, it is convenient to receive request in json.  Here's
+a convenience wrapper:
+
+    (with-post-json INNER-HANDLER :key ON-ERROR)
+
+It parses the request body as json, and set the parsed value in
+`request-params` with the key "json-body".  That is, INNER-HANDLER
+can access the parsed json by `(request-param-ref req "json-body")`.
+If the client didn't pass the body, the "json-body" parameter is `#f`.
+
+Json dictionary becomes an alist, and json array becomes a vector.
+See the documentation of
+[`rfc.json`](http://practical-scheme.net/gauche/man/?p=rfc.json), for
+the details.
+
+ON-ERROR is a procedure that takes three argument, as
+`(on-error req app condition)`, and called when a `<json-parse-error>`
+is raised during parsing.  It must either return an alternative value
+to be used as the value of "json-body", or call `request-error` to
+notify the client the error.  If omitted or `#f`, the procedure
+returns 400 error to the client.
+
+
+#### Retrieving raw body
+
+If you don't use one of the POST handlers above, the request body
+isn't read when the handler is called.  The easiest way to retrieve
+the request body at once is using `read-request-body`:
+
+    (read-request-body req)
+
+This reads the request body into u8vector.  It can return `#f` if
+the request has no body.
+
+If the body has already read (even partially), or ended prematurely
+(i.e. the data is smaller than the size stated by content-length),
+this procedure returns `#<eof>`.
+
+
+#### Roll your own reader
+
+If you need to handle request body specially (for example, if the client
+sends huge binary data, you don't want to read everyhing into memory),
+you can handle it by yourself.  When the handler is called, the request
+body is available to be read from `(request-iport req)`.  Check
+the content-type header first, for it must specify the size of the request
+body in octets.
 
 
 ### Response
@@ -452,29 +555,6 @@ that adds "Cache-control: public" header to the file response.
 
 Since that the headers are added before the inner handler is called,
 they may be overwritten by inner-handler.
-
-
-### Handling POST request parameters
-
-A query string in a request url is automatically parsed and
-accessible via `request-query`, `request-params` and `request-param-ref`,
-but the parameters passed via POST body aren't processed by default.
-
-The following procedure returns a handler that parses POST request body
-and put the parsed result to `request-params`:
-
-    (with-post-parameters INNER-HANDLER :key PART-HANDLERS)
-
-The REQUEST structure the INNER-HANDLER receives got parsed parameters
-(If the original request also has a query string in url, that will be
-overwritten.)
-
-PART-HANDLERS specifies how to handle each parameter is handled
-according to its name.  By default, all parameter values are
-read into strings.  However, you might not want that behavior if
-you're accepting large file updates.  See the documentation of
-[`www.cgi`](http://practical-scheme.net/gauche/man/?p=www.cgi) module
-for the meaning of PART-HANDLERS.
 
 
 ## Logging and tuning
