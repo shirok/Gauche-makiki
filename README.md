@@ -314,13 +314,13 @@ returns 400 error to the client.
 #### Retrieving raw body
 
 If you don't use one of the POST handlers above, the request body
-isn't read when the handler is called.  The easiest way to retrieve
-the request body at once is using `read-request-body`:
+hasn't been read when the handler is called.  The easiest way to
+retrieve the request body at once is using `read-request-body`:
 
     (read-request-body req)
 
-This reads the request body into u8vector.  It can return `#f` if
-the request has no body.
+This reads the request body into a fresh u8vector and returns it.
+It can return `#f` if the request has no body.
 
 If the body has already read (even partially), or ended prematurely
 (i.e. the data is smaller than the size stated by content-length),
