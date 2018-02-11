@@ -409,7 +409,7 @@ Check out scripts in `examples` directory for some concrete examples.
 ### Errors and response
 
 You can raise a condition `<request-error>` to nofity the client that
-you encounter an error during processign the request.  Use the
+you encounter an error during processing the request.  Use the
 `request-error` procedure to raise the condition:
 
     (request-error :key status body content-type)

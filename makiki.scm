@@ -669,23 +669,6 @@
     (with-profiling-handler prof-out dispatcher)
     (dispatcher req app)))
 
-(define with-profiling-handler
-  (let1 mutex (make-mutex)
-    (^[prof-out handler]
-      (^[req app]
-        (let1 out (open-output-string)
-          (begin0 ($ with-output-to-port out
-                     (cut with-profiler (cut handler req app)))
-            (with-locking-mutex mutex
-              (^[] (with-output-to-file prof-out
-                     (^[]
-                       (format #t "~a: ~a\n"
-                               (logtime (current-time))
-                               (request-path req))
-                       (display (get-output-string out))
-                       (newline))
-                     :if-exists :append)))))))))
-
 (define *method-dispatchers* (make-mtqueue))
 
 (define (find-method-dispatcher method)
@@ -852,10 +835,11 @@
     [else "text/plain"])) ; fallback
 
 ;;;
-;;; Adds header
+;;; Handler wrappers
 ;;;
 
 ;; API
+;; Add headers.
 ;; header&values are keyword-value list.  Each keyword names header field,
 ;; and the value can be a string, a procedure that takes REQ and APP to
 ;; retrun a string value, or #f to omit the header.
@@ -871,11 +855,9 @@
         (response-header-push! req (x->string (car h&v)) val)))
     (inner-handler req app)))
 
-;;;
-;;; Handling POST request
-;;;
-
 ;; API
+;; Read POST body as application/x-www-form-urlencoded or multipart/form-data
+;; and fold result into request-params.
 ;; part-handlers are the same as cgi-parse-parameters
 (define (with-post-parameters inner-handler :key (part-handlers '()))
   (^[req app]
@@ -894,6 +876,10 @@
     (inner-handler req app)))
 
 ;; API
+;; Read POST body as JSON and set result in the "json-body" parameter in
+;; request-params.
+;; on-error is invoked with req, app and <json-parse-error> in case of
+;; json parse error.
 (define (with-post-json inner-handler :key (on-error #f))
   (^[req app]
     (if (eq? (request-method req) 'POST)
@@ -910,4 +896,23 @@
         (request-params-set! req `(("json-body" ,json) ,@(request-params req)))
         (inner-handler req app))
       (inner-handler req app))))
-  
+
+;; API
+;; Wrap handler with profiler.  The profiler result is written out to
+;; the file named by PROF-OUT.
+(define with-profiling-handler
+  (let1 mutex (make-mutex)
+    (^[prof-out handler]
+      (^[req app]
+        (let1 out (open-output-string)
+          (begin0 ($ with-output-to-port out
+                     (cut with-profiler (cut handler req app)))
+            (with-locking-mutex mutex
+              (^[] (with-output-to-file prof-out
+                     (^[]
+                       (format #t "~a: ~a\n"
+                               (logtime (current-time))
+                               (request-path req))
+                       (display (get-output-string out))
+                       (newline))
+                     :if-exists :append)))))))))
