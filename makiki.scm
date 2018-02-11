@@ -1,8 +1,7 @@
 ;;;
 ;;; makiki - a small http server
 ;;;
-;;;
-;;;   Copyright (c) 2010-2016 Shiro Kawai  <shiro@acm.org>
+;;;   Copyright (c) 2010-2018 Shiro Kawai  <shiro@acm.org>
 ;;;
 ;;;   Redistribution and use in source and binary forms, with or without
 ;;;   modification, are permitted provided that the following conditions
@@ -30,6 +29,7 @@
 ;;;   LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
 ;;;   NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 ;;;   SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+;;;
 
 (define-module makiki
   (use gauche.parameter)
@@ -615,7 +615,7 @@
                                (^[fd condition] (set! looping #f))
                                '(r)))
               (when startup-callback (startup-callback ssocks))
-              (access-log "started on ~a"
+              (access-log "Started on ~a"
                           (map (.$ sockaddr-name socket-address) ssocks))
               ;; Main loop
               (while looping (selector-select sel))
