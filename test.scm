@@ -201,6 +201,41 @@
        )))
 
 ;;;
+(test-section "server error handler")
+
+($ call-with-server "tests/server-error.scm"
+   (^[p s t]
+     (test* "server error handler" '("500" "Internal Server Error")
+            (receive (status hdrs body) (http-get s "/?foo=z")
+              (list status body)))
+     (test* "server error handler" '("500" "Internal Server Error")
+            (receive (status hdrs body) 
+                (http-get s "/?foo=z" :accept "text/plain")
+              (list status body)))
+     (test* "server error handler" '("500" "<html><head><title>Internal Server Error</title\n></head\n><body><h1>Internal Server Error</h1\n><p></p\n></body\n></html\n>")
+            (receive (status hdrs body) 
+                (http-get s "/?foo=z" :accept "text/html")
+              (list status body)))
+     (test* "server error handler" '("500" "{\"status\":500,\"message\":\"Internal Server Error\"}")
+            (receive (status hdrs body) 
+                (http-get s "/?foo=z" :accept "application/json")
+              (list status body)))
+
+     (test* "server error handler" '("500" "Internal Server Error: number required, but got \"z\"")
+            (receive (status hdrs body) 
+                (http-get s "/?foo=z&debug=true" :accept "text/plain")
+              (list status body)))
+     (test* "server error handler" '("500" "<html><head><title>Internal Server Error</title\n></head\n><body><h1>Internal Server Error</h1\n><p>number required, but got \"z\"</p\n></body\n></html\n>")
+            (receive (status hdrs body) 
+                (http-get s "/?foo=z&debug=true" :accept "text/html")
+              (list status body)))
+     (test* "server error handler" '("500" "{\"status\":500,\"message\":\"Internal Server Error: number required, but got \\\"z\\\"\"}")
+            (receive (status hdrs body) 
+                (http-get s "/?foo=z&debug=true" :accept "application/json")
+              (list status body)))
+     ))
+
+;;;
 (test-section "server termination")
 
 (test* "/a" 1

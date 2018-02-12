@@ -430,6 +430,18 @@ the handler, it is captured by makiki and the client receives
 `500 Internal Server Error` response, and the error itself is logged
 to the error log.
 
+The content-type and the body of such 500 response is determined by
+the "Accept" request header; if the request has "Accept: application/json",
+the error response is in JSON.  For the time being, we recognize
+application/json and text/html, and for all other content-type we return
+a plain text (text/plain).
+
+By default, we only return "Internal Server Error" to the client,
+which is a bit inconvenient during development.  If the environment
+variable MAKIKI_DEBUG is set when the server is run, we add
+the error message in the error response as well.  Make sure you don't
+set the environment variable in the production environment, so that you
+wouln't reveal any internal information accidentally.
 
 ## Built-in handlers
 

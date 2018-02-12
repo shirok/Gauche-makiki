@@ -60,6 +60,7 @@
   (export start-http-server http-server-software
           access-log access-log-drain
           error-log error-log-drain
+          debugging
           add-method-dispatcher!
           make-server-control-channel
           terminate-server-loop
@@ -98,6 +99,7 @@
 (define http-server-software (make-parameter "gauche/makiki"))
 (define file-mime-type (make-parameter (^[path] #f)))
 (define profiler-output (make-parameter (sys-getenv "MAKIKI_PROFILER_OUTPUT")))
+(define debugging (make-parameter (sys-getenv "MAKIKI_DEBUGGING")))
 
 ;;;
 ;;; Logging
@@ -643,8 +645,8 @@
 
 (define (handle-client app csock)
   (guard (e [else
-             (let1 trace (call-with-output-string (cut report-error e <>))
-               (error-log "handle-client error ~s\n~a" (~ e'message) trace))
+             (error-log "handle-client error ~s\n~a" (~ e'message)
+                        (report-error e #f))
              (respond/ng (make-ng-request #"[E] ~(~ e'message)" csock) 500)])
     (let1 line (read-line (socket-input-port csock))
       (rxmatch-case line
@@ -659,10 +661,47 @@
              (guard (e [(<request-error> e)
                         (respond/ng req (~ e'status) :body (~ e'body)
                                     :content-type (~ e'content-type))]
-                       [else (raise e)])
+                       [else
+                        (error-log "http handler error ~s\n~a" (~ e'message)
+                                   (report-error e #f))
+                        (receive (status content-type body)
+                            (server-error-handler req app e)
+                          (respond/ng req status :body body 
+                                      :content-type content-type))])
                (dispatch-worker dispatcher req app))
              (respond/ng (make-ng-request #"[E] ~line" csock) 501)))]
         [else (respond/ng (make-ng-request #"[E] ~line" csock) 400)]))))
+
+(define (server-error-handler req app e) ;returns status, content-type and body
+  (define (parse-accept-header value)
+    (map (^s (match-let1 (content-type . opts) (string-split s #/\s*\;\s*/)
+               (cons content-type
+                     (map (^p (string-split (string-trim-both p) "=" 1)) opts))))
+         (string-split value #/\s*,\s*/)))
+  (define (select-reply-content-type accepts-alist)
+    ;; We should look at q value, but it's unlikely that client wants both
+    ;; json and html.
+    (find (^[content-type] (and (assoc-ref accepts-alist content-type) 
+                                content-type))
+          '("application/json" "text/html" "text/plain")))
+  (define ISE "Internal Server Error")
+  (define (html-error-page)
+    (html:html
+     (html:head (html:title ISE))
+     (html:body (html:h1 ISE)
+                (html:p (if (debugging) (~ e'message) "")))))
+  (define (text-error-page) 
+    (if (debugging) #"~|ISE|: ~(~ e'message)" ISE))
+  (define (json-error-page)
+    `(json (("status" . 500)
+            ("message" . ,(if (debugging) #"~|ISE|: ~(~ e'message)" ISE)))))
+  (let* ([content-type ($ select-reply-content-type $ parse-accept-header
+                          $ request-header-ref req "accept" "")]
+         [body (cond
+                [(equal? content-type "application/json") (json-error-page)]
+                [(equal? content-type "text/html") (html-error-page)]
+                [else (text-error-page)])])
+    (values 500 content-type body)))
 
 (define (dispatch-worker dispatcher req app)
   (if-let1 prof-out (profiler-output)
