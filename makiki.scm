@@ -85,7 +85,13 @@
           file-handler file-mime-type
           with-header-handler with-post-parameters with-post-json
           with-profiling-handler
-          profiler-output)
+          profiler-output
+          virtual-socket-input-port
+          virtual-socket-output-port
+          virtual-socket-getpeername
+          virtual-socket-getsockname
+          virtual-socket-close
+          virtual-socket-shutdown)
   )
 (select-module makiki)
 
@@ -133,6 +139,33 @@
        (log-format drain fmt args ...))]))
 
 ;;;
+;;; Virtual socket - extensible socket
+;;;
+
+(define-class <virtual-socket> ()
+  ((socket :init-keyword :socket :accessor virtual-socket-socket)))
+(define-method virtual-socket-getsockname ((vsock <virtual-socket>))
+  (socket-getsockname (virtual-socket-socket vsock)))
+(define-method virtual-socket-getpeername ((vsock <virtual-socket>))
+  (socket-getpeername (virtual-socket-socket vsock)))
+(define-method virtual-socket-input-port ((vsock <virtual-socket>))
+  (socket-input-port (virtual-socket-socket vsock)))
+(define-method virtual-socket-output-port ((vsock <virtual-socket>))
+  (socket-output-port (virtual-socket-socket vsock)))
+(define-method virtual-socket-fd ((vsock <virtual-socket>))
+  (socket-fd (virtual-socket-socket vsock)))
+(define-method virtual-socket-accept ((vsock <virtual-socket>))
+  (socket-accept (virtual-socket-socket vsock)))
+(define-method virtual-socket-address ((vsock <virtual-socket>))
+  (socket-address (virtual-socket-socket vsock)))
+(define-method virtual-socket-close ((vsock <virtual-socket>))
+  (socket-close (virtual-socket-socket vsock)))
+(define-method virtual-socket-shutdown ((vsock <virtual-socket>) how)
+  (socket-shutdown (virtual-socket-socket vsock) how))
+(define (virtualize-socket sock)
+  (make <virtual-socket> :socket sock))
+
+;;;
 ;;; Request packet
 ;;;
 
@@ -166,14 +199,14 @@
 (define-inline (make-request request-line csock method request-uri
                              http-vers headers)
   (define host:port ($ rfc822-header-ref headers "host"
-                       $ sockaddr-name $ socket-getsockname csock))
+                       $ sockaddr-name $ virtual-socket-getsockname csock))
   (define-values (auth path query frag)
     (uri-decompose-hierarchical request-uri))
   (define-values (host port)
     (if-let1 m (#/:(\d+)$/ host:port)
       (values (m'before) (x->integer (m 1)))
       (values host:port 80)))
-  (%make-request request-line csock (socket-getpeername csock)
+  (%make-request request-line csock (virtual-socket-getpeername csock)
                  method request-uri http-vers host port
                  (uri-decode-string path :cgi-decode #t) #f #f
                  query (cgi-parse-parameters :query-string (or query ""))
@@ -181,7 +214,7 @@
                  '() #f '() 0))
 
 (define-inline (make-ng-request msg socket)
-  (%make-request msg socket (socket-getpeername socket) ""
+  (%make-request msg socket (virtual-socket-getpeername socket) ""
                  "" "" "" 80 "" #f #f "" '() '() #f '() '() #f '() 0))
 
 ;; API
@@ -193,8 +226,10 @@
          (x->string body)))
 
 ;; APIs
-(define-inline (request-iport req) (socket-input-port (request-socket req)))
-(define-inline (request-oport req) (socket-output-port (request-socket req)))
+(define-inline (request-iport req)
+  (virtual-socket-input-port (request-socket req)))
+(define-inline (request-oport req)
+  (virtual-socket-output-port (request-socket req)))
 
 ;; API
 ;; Read request body into u8vector.  May return #f if request has no body.
@@ -597,9 +632,10 @@
                  [exit-value-queue (make-mtqueue)])
     (let* ([pool (tpool:make-thread-pool num-threads :max-backlog max-backlog)]
            [tlog (kick-logger-thread pool forwarded?)]
-           [ssocks (if path
-                     (list (make-server-socket 'unix path))
-                     (make-server-sockets host port :reuse-addr? #t))]
+           [ssocks (map virtualize-socket
+                        (if path
+                            (list (make-server-socket 'unix path))
+                            (make-server-sockets host port :reuse-addr? #t)))]
            [looping #t])
       (guard (e [(and (<unhandled-signal-error> e)
                       (memv (~ e'signal) `(,SIGINT ,SIGTERM)))
@@ -608,9 +644,10 @@
         (unwind-protect
             (let1 sel (make <selector>)
               (dolist [s ssocks]
-                ($ selector-add! sel (socket-fd s)
+                ($ selector-add! sel (virtual-socket-fd s)
                    (^[fd condition]
-                     (accept-client app-data (socket-accept s) pool))
+                     (accept-client app-data (virtualize-socket
+                                              (virtual-socket-accept s)) pool))
                    '(r)))
               (when control-channel
                 (selector-add! sel (control-channel 'get-channel)
@@ -618,7 +655,8 @@
                                '(r)))
               (when startup-callback (startup-callback ssocks))
               (access-log "Started on ~a"
-                          (map (.$ sockaddr-name socket-address) ssocks))
+                          (map (.$ sockaddr-name virtual-socket-address)
+                               ssocks))
               ;; Main loop
               (while looping (selector-select sel))
               (if (queue-empty? (exit-value-queue))
@@ -635,8 +673,8 @@
   (thread-start! (make-thread (cut logger pool forwarded?))))
 
 (define (%socket-discard sock)
-  (socket-close sock)
-  (socket-shutdown sock SHUT_RDWR))
+  (virtual-socket-close sock)
+  (virtual-socket-shutdown sock SHUT_RDWR))
 
 (define (accept-client app csock pool)
   (unless (tpool:add-job! pool (cut handle-client app csock) #t)
@@ -648,14 +686,15 @@
              (error-log "handle-client error ~s\n~a" (~ e'message)
                         (report-error e #f))
              (respond/ng (make-ng-request #"[E] ~(~ e'message)" csock) 500)])
-    (let1 line (read-line (socket-input-port csock))
+    (let1 line (read-line (virtual-socket-input-port csock))
       (rxmatch-case line
         [test eof-object?
          (respond/ng (make-ng-request "(empty request)" csock) 400
                      :no-response #t)]
         [#/^(\w+)\s+(\S+)\s+HTTP\/(\d+\.\d+)$/ (_ meth req-uri httpvers)
          (let* ([method (string->symbol (string-upcase meth))]
-                [headers (rfc822-read-headers (socket-input-port csock))]
+                [headers (rfc822-read-headers
+                          (virtual-socket-input-port csock))]
                 [req (make-request line csock method req-uri httpvers headers)])
            (if-let1 dispatcher (find-method-dispatcher method)
              (guard (e [(<request-error> e)
