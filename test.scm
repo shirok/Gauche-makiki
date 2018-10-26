@@ -19,7 +19,7 @@
 (define (call-with-server path proc)
   (let* ([p (run-process `(gosh "-I." ,path "--port" 0)
                             :output :pipe :error :pipe :wait #f)]
-         [port (get-port p)]
+         [port (get-port p path)]
          [host #"localhost:~port"])
     (unwind-protect (proc p host port)
       (process-kill p))))
@@ -27,13 +27,13 @@
 (define (call-with-server/exit-status path proc)
   (let* ([p (run-process `(gosh "-I." ,path "--port" 0)
                          :output :pipe :error :pipe :wait #f)]
-         [port (get-port p)]
+         [port (get-port p path)]
          [host #"localhost:~port"])
     (proc p host port)
     (process-wait p)
     (sys-wait-exit-status (process-exit-status p))))
 
-(define (get-port proc)
+(define (get-port proc path)
   (rxmatch-case (read-line (process-error proc))
     [#/started on \(.*:(\d+)\)/i (_ pp) (x->integer pp)]
     [else => (cut errorf "failed to start server script ~s: ~a" path <>)]))
