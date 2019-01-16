@@ -166,14 +166,14 @@
 (define-inline (make-request request-line csock method request-uri
                              http-vers headers)
   (define host:port ($ rfc822-header-ref headers "host"
-                       $ sockaddr-name $ socket-getsockname csock))
+                       $ sockaddr-name $ connection-self-address csock))
   (define-values (auth path query frag)
     (uri-decompose-hierarchical request-uri))
   (define-values (host port)
     (if-let1 m (#/:(\d+)$/ host:port)
       (values (m'before) (x->integer (m 1)))
       (values host:port 80)))
-  (%make-request request-line csock (socket-getpeername csock)
+  (%make-request request-line csock (connection-peer-address csock)
                  method request-uri http-vers host port
                  (uri-decode-string path :cgi-decode #t) #f #f
                  query (cgi-parse-parameters :query-string (or query ""))
@@ -181,7 +181,7 @@
                  '() #f '() 0))
 
 (define-inline (make-ng-request msg socket)
-  (%make-request msg socket (socket-getpeername socket) ""
+  (%make-request msg socket (connection-peer-address socket) ""
                  "" "" "" 80 "" #f #f "" '() '() #f '() '() #f '() 0))
 
 ;; API
@@ -193,8 +193,8 @@
          (x->string body)))
 
 ;; APIs
-(define-inline (request-iport req) (socket-input-port (request-socket req)))
-(define-inline (request-oport req) (socket-output-port (request-socket req)))
+(define-inline (request-iport req) (connection-input-port (request-socket req)))
+(define-inline (request-oport req) (connection-output-port (request-socket req)))
 
 ;; API
 ;; Read request body into u8vector.  May return #f if request has no body.
@@ -635,8 +635,8 @@
   (thread-start! (make-thread (cut logger pool forwarded?))))
 
 (define (%socket-discard sock)
-  (socket-close sock)
-  (socket-shutdown sock SHUT_RDWR))
+  (connection-close sock)
+  (connection-shutdown sock 'both))
 
 (define (accept-client app csock pool)
   (unless (tpool:add-job! pool (cut handle-client app csock) #t)
@@ -648,14 +648,14 @@
              (error-log "handle-client error ~s\n~a" (~ e'message)
                         (report-error e #f))
              (respond/ng (make-ng-request #"[E] ~(~ e'message)" csock) 500)])
-    (let1 line (read-line (socket-input-port csock))
+    (let1 line (read-line (connection-input-port csock))
       (rxmatch-case line
         [test eof-object?
          (respond/ng (make-ng-request "(empty request)" csock) 400
                      :no-response #t)]
         [#/^(\w+)\s+(\S+)\s+HTTP\/(\d+\.\d+)$/ (_ meth req-uri httpvers)
          (let* ([method (string->symbol (string-upcase meth))]
-                [headers (rfc822-read-headers (socket-input-port csock))]
+                [headers (rfc822-read-headers (connection-input-port csock))]
                 [req (make-request line csock method req-uri httpvers headers)])
            (if-let1 dispatcher (find-method-dispatcher method)
              (guard (e [(<request-error> e)
