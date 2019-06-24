@@ -730,7 +730,7 @@
     ;; using cgi-temporary-files.
     (for-each sys-unlink (cgi-temporary-files))))
 
-(dolist [m '(GET HEAD POST PUT DELETE OPTIONS)]
+(dolist [m '(GET HEAD POST PUT PATCH DELETE OPTIONS)]
   (add-method-dispatcher! m %default-dispatch))
 
 ;;;
