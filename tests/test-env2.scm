@@ -11,5 +11,3 @@
 
 (define-http-handler "/"
   (cgi-script "tests/env.scm"))
-
-

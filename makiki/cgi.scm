@@ -52,7 +52,7 @@
 ;; API
 ;;
 ;; This can be used to call a cgi program's main procedure PROC,
-;; with setting cgi metavariables and current i/o's. 
+;; with setting cgi metavariables and current i/o's.
 ;; We don't support http authentications yet.
 ;;
 ;; SCRIPT-NAME should be an absolute path of the script that appear in
@@ -113,7 +113,7 @@
     (^[req app]
       ((cgi-handler (load-script) :script-name script-name) req app))
     (cgi-handler (load-script) :script-name script-name)))
-     
+
 ;; Sets up cgi metavariables.
 (define (get-cgi-metavariables req script-name)
   (cond-list
@@ -146,5 +146,4 @@
    [#t `("SERVER_PORT" ,(request-server-port req))]
    [#t `("SERVER_PROTOCOL" "HTTP/1.1")]
    [#t `("SERVER_SOFTWARE" ,(http-server-software))]
-   ))  
-
+   ))

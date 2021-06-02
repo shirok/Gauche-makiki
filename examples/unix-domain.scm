@@ -4,5 +4,3 @@
                                        :error-log #t))
 (define-http-handler "/"
   (^[req app] (respond/ok req "<h1>Running over a unix domain socket.</h1>")))
-
-

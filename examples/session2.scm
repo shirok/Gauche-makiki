@@ -12,7 +12,7 @@
 (use makiki)
 
 ;; application
-(define-class <app> () 
+(define-class <app> ()
   (;; session table is just a TTLR cache, keyed by session token in the cookie.
    ;; session data :
    ;;  (#f . <path>)     - a non-logged-in client is trying to access <path>

@@ -12,9 +12,3 @@
        ,(write-to-string
          `((parameters ,@params)
            (environments ,@(get-environment-variables))))))))
-
-           
-
-            
-                                                          
-                          

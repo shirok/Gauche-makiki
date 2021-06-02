@@ -14,4 +14,3 @@
 
 (define-http-handler "/"
   (cgi-handler env-main :script-name "env.scm"))
-

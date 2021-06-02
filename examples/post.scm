@@ -43,7 +43,3 @@
 ;; Local variables:
 ;; mode: scheme
 ;; end:
-
-
-        
-

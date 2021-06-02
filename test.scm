@@ -71,7 +71,7 @@
      (test* "POST"   "post"   (values-ref (http-post s "/" "") 2))
      (test* "PUT"    "put"    (values-ref (http-put s "/" "") 2))
      (test* "DELETE" "delete" (values-ref (http-delete s "/") 2))
-     
+
      (test* "OPTIONS" "HTTP/1.1 404 Not Found"
             (let1 s (make-client-socket 'inet "localhost" t)
               (unwind-protect
@@ -111,7 +111,7 @@
        (test* #`"(,server-file) empty parameters" (get-environment-variables)
               (assq-ref (read-from-string (values-ref (http-get s "/") 2))
                         'environments)
-              (cut lset= equal? <> <>))          
+              (cut lset= equal? <> <>))
        (test* #`"(,server-file )with parameters"
               '(("a" ")(!#%%$!*^({}<>" "wat?") ("b" ""))
               (assq-ref (read-from-string
@@ -209,28 +209,28 @@
             (receive (status hdrs body) (http-get s "/?foo=z")
               (list status body)))
      (test* "server error handler" '("500" "Internal Server Error")
-            (receive (status hdrs body) 
+            (receive (status hdrs body)
                 (http-get s "/?foo=z" :accept "text/plain")
               (list status body)))
      (test* "server error handler" '("500" "<html><head><title>Internal Server Error</title\n></head\n><body><h1>Internal Server Error</h1\n><p></p\n></body\n></html\n>")
-            (receive (status hdrs body) 
+            (receive (status hdrs body)
                 (http-get s "/?foo=z" :accept "text/html")
               (list status body)))
      (test* "server error handler" '("500" "{\"status\":500,\"message\":\"Internal Server Error\"}")
-            (receive (status hdrs body) 
+            (receive (status hdrs body)
                 (http-get s "/?foo=z" :accept "application/json")
               (list status body)))
 
      (test* "server error handler" '("500" "Internal Server Error: number required, but got \"z\"")
-            (receive (status hdrs body) 
+            (receive (status hdrs body)
                 (http-get s "/?foo=z&debug=true" :accept "text/plain")
               (list status body)))
      (test* "server error handler" '("500" "<html><head><title>Internal Server Error</title\n></head\n><body><h1>Internal Server Error</h1\n><p>number required, but got \"z\"</p\n></body\n></html\n>")
-            (receive (status hdrs body) 
+            (receive (status hdrs body)
                 (http-get s "/?foo=z&debug=true" :accept "text/html")
               (list status body)))
      (test* "server error handler" '("500" "{\"status\":500,\"message\":\"Internal Server Error: number required, but got \\\"z\\\"\"}")
-            (receive (status hdrs body) 
+            (receive (status hdrs body)
                 (http-get s "/?foo=z&debug=true" :accept "application/json")
               (list status body)))
      ))

@@ -666,7 +666,7 @@
                                    (report-error e #f))
                         (receive (status content-type body)
                             (server-error-handler req app e)
-                          (respond/ng req status :body body 
+                          (respond/ng req status :body body
                                       :content-type content-type))])
                (dispatch-worker dispatcher req app))
              (respond/ng (make-ng-request #"[E] ~line" csock) 501)))]
@@ -681,7 +681,7 @@
   (define (select-reply-content-type accepts-alist)
     ;; We should look at q value, but it's unlikely that client wants both
     ;; json and html.
-    (find (^[content-type] (and (assoc-ref accepts-alist content-type) 
+    (find (^[content-type] (and (assoc-ref accepts-alist content-type)
                                 content-type))
           '("application/json" "text/html" "text/plain")))
   (define ISE "Internal Server Error")
@@ -690,7 +690,7 @@
      (html:head (html:title ISE))
      (html:body (html:h1 ISE)
                 (html:p (if (debugging) (~ e'message) "")))))
-  (define (text-error-page) 
+  (define (text-error-page)
     (if (debugging) #"~|ISE|: ~(~ e'message)" ISE))
   (define (json-error-page)
     `(json (("status" . 500)
