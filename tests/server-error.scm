@@ -4,7 +4,7 @@
 
 (define (main args)
   (let-args (cdr args) ([p "port=i"])
-    (start-http-server :access-log #t :error-log #t :port p))
+    (start-http-server :access-log #t :error-log "test-server.log" :port p))
   0)
 
 (define-http-handler "/"
