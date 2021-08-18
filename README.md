@@ -137,7 +137,7 @@ The following convenience procedures are avaiable on the request record.
     (request-iport REQ)     ; input port to read from the client
     (request-oport REQ)     ; output port to write to the client.
                             ;  NB: the handler proc shouldn't write
-                            ;  to this port normally---one of the 
+                            ;  to this port normally---one of the
                             ;  'respond' procedures below takes care of
                             ;  writing response line and headers.
 
@@ -360,7 +360,7 @@ various types of replies.
                             ; Send back a redirection message using Location
                             ; header.  URI can be an absolute uri or
                             ; just a path component; in the latter case,
-                            ; protocol, host and port compoents are 
+                            ; protocol, host and port compoents are
                             ; automatically added.
 
 These procedures return after the entire message is sent.  If an error
@@ -453,7 +453,7 @@ the following handler definition serves files under `document-root`:
     (define-http-handler "/"  (file-handler))
 
 Some handler-builders takes another handler procedure and returns
-a new handler that augments the original handler.  
+a new handler that augments the original handler.
 
 See [examples](examples/) for more usages.
 
@@ -514,7 +514,7 @@ Loads the cgi script in FILE, and creates and returns a cgi handler that
 calls a procedure named by ENTRY-POINT inside the script (`main` by default).
 
 To avoid interference with makiki itself, the script is loaded
-into an independent, anonymous module.  
+into an independent, anonymous module.
 
 Loading is done only once unless LOAD-EVERY-TIME is true.
 Usually, loading only once cuts the overhead of script loading for
@@ -605,7 +605,7 @@ it runs `INNER-HANDLER` with profiler running, and then write out
 the result to `OUTPUT-FILE`.   When `OUTPUT-FILE` already exists,
 the result is appended to it.
 
-You should use either one of the above method, but not both; 
+You should use either one of the above method, but not both;
 `MAKIKI_PROFILER_OUTPUT` tries to profile every handler, even it
 is already wrapped by `with-post-parameters`.
 
@@ -723,4 +723,3 @@ See [simple proxy example](examples/proxy.scm).
 
 The [examples](examples/) directory contains some simple server scripts,
 each one shows how to implement a specific fuctionality.
-
