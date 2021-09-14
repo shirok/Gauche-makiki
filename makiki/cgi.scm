@@ -120,7 +120,8 @@
 
   (if load-every-time
     (^[req app]
-      ((cgi-handler (load-script) :script-name script-name) req app))
+      ((cgi-handler (load-script) :script-name script-name :forwarded forwarded)
+       req app))
     (cgi-handler (load-script) :script-name script-name :forwarded forwarded)))
 
 ;; Sets up cgi metavariables.
@@ -157,7 +158,9 @@
                                  (request-header-ref req "x-forwarded-host"))
                             (request-server-host req)))]
    [#t `("SERVER_PORT" ,(or (and forwarded
-                                 (request-header-ref req "x-forwarded-port"))
+                                 (or
+                                  (request-header-ref req "x-forwarded-port")
+                                  80))
                             (request-server-port req)))]
    [#t `("SERVER_PROTOCOL" "HTTP/1.1")]
    [#t `("SERVER_SOFTWARE" ,(http-server-software))]
