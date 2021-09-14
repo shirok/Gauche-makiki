@@ -59,17 +59,18 @@
 ;; URL.  That is, if you want to make the script invoked as
 ;; http://example.com/foo/bar/baz.cgi, give "/foo/bar/baz.cgi".
 ;; It is necessary to calculate PATH_INFO properly.
-(define (cgi-handler proc :key (script-name ""))
+(define (cgi-handler proc :key (script-name "") (forwarded #f))
   (^[req app]
     (let1 out (open-output-string)
       (with-input-from-port (request-iport req)
         (^[]
-          (let1 r (parameterize ([cgi-metavariables
-                                  (get-cgi-metavariables req script-name)]
-                                 [current-output-port
-                                  (make <buffered-output-port>
-                                    :flush (^[v f] (write-block v out)
-                                                   (u8vector-length v)))])
+          (let1 r (parameterize
+                      ([cgi-metavariables
+                        (get-cgi-metavariables req script-name forwarded)]
+                       [current-output-port
+                        (make <buffered-output-port>
+                          :flush (^[v f] (write-block v out)
+                                   (u8vector-length v)))])
                     (unwind-protect (proc `(,script-name))
                       (close-output-port (current-output-port))))
             (if (zero? r)
@@ -101,9 +102,17 @@
 ;; a specific module; if it has it's own define-module and
 ;; select-module, the module will be shared for every load, and
 ;; we won't have enough isolation.
+;;
+;; If FORWARDED is true, some CGI metavariables are overridden with
+;; X-Forwarded-* header values.  They are useful if Makiki is running
+;; behind a reverse proxy.
+;;   X-Forwarded-Host   SERVER_NAME
+;;   X-Forwarded-Port   SERVER_PORT
+;;   X-Forwarded-For    REMOTE_ADDR
 (define (cgi-script file :key (entry-point 'main)
                               (script-name "")
-                              (load-every-time #f))
+                              (load-every-time #f)
+                              (forwarded #f))
   (define (load-script) ;returns entry point procedure
     (let1 mod (make-module #f)
       (load file :environment mod)
@@ -112,10 +121,10 @@
   (if load-every-time
     (^[req app]
       ((cgi-handler (load-script) :script-name script-name) req app))
-    (cgi-handler (load-script) :script-name script-name)))
+    (cgi-handler (load-script) :script-name script-name :forwarded forwarded)))
 
 ;; Sets up cgi metavariables.
-(define (get-cgi-metavariables req script-name)
+(define (get-cgi-metavariables req script-name forwarded)
   (cond-list
    ;; AUTH_TYPE - not supported yet
    [(request-header-ref req "content-length")
@@ -131,19 +140,25 @@
    [#t `("PATH_TRANSLATED" ;todo - flexible path trans.
          ,(string-append (document-root) (request-path req)))]
    [#t `("QUERY_STRING" ,(request-query req))]
-   [#t `("REMOTE_ADDR" ,(let1 addr (request-remote-addr req)
-                          (inet-address->string (sockaddr-addr addr)
-                                                (case (sockaddr-family addr)
-                                                  [(inet)  AF_INET]
-                                                  [(inet6) AF_INET6]
-                                                  [else AF_INET]))))]
+   [#t `("REMOTE_ADDR" ,(or (and forwarded
+                                 (request-header-ref req "x-forwarded-for"))
+                            (let1 addr (request-remote-addr req)
+                              (inet-address->string (sockaddr-addr addr)
+                                                    (case (sockaddr-family addr)
+                                                      [(inet)  AF_INET]
+                                                      [(inet6) AF_INET6]
+                                                      [else AF_INET])))))]
    [#t `("REMOTE_HOST"  ,(request-remote-addr req))]
    ;; REMOTE_IDENT - not supported
    ;; REMOTE_USER - not supported
    [#t `("REQUEST_METHOD" ,(x->string (request-method req)))]
    [#t `("SCRIPT_NAME" ,script-name)]
-   [#t `("SERVER_NAME" ,(request-server-host req))]
-   [#t `("SERVER_PORT" ,(request-server-port req))]
+   [#t `("SERVER_NAME" ,(or (and forwarded
+                                 (request-header-ref req "x-forwarded-host"))
+                            (request-server-host req)))]
+   [#t `("SERVER_PORT" ,(or (and forwarded
+                                 (request-header-ref req "x-forwarded-port"))
+                            (request-server-port req)))]
    [#t `("SERVER_PROTOCOL" "HTTP/1.1")]
    [#t `("SERVER_SOFTWARE" ,(http-server-software))]
    ))
