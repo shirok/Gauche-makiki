@@ -166,4 +166,9 @@
                             (request-server-port req)))]
    [#t `("SERVER_PROTOCOL" "HTTP/1.1")]
    [#t `("SERVER_SOFTWARE" ,(http-server-software))]
+   ;; NB: For now, Makiki itself isn't capable of serving https, so
+   ;; this only happens when it is behind a reverse proxy.
+   [(and forwarded
+         (equal? (request-header-ref req "x-forwarded-proto") "https"))
+    ("HTTPS" "on")]
    ))
