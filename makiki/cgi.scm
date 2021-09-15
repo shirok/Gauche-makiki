@@ -170,5 +170,5 @@
    ;; this only happens when it is behind a reverse proxy.
    [(and forwarded
          (equal? (request-header-ref req "x-forwarded-proto") "https"))
-    ("HTTPS" "on")]
+    '("HTTPS" "on")]
    ))
