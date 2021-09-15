@@ -160,7 +160,9 @@
    [#t `("SERVER_PORT" ,(or (and forwarded
                                  (or
                                   (request-header-ref req "x-forwarded-port")
-                                  80))
+                                  (if (equal? (request-header-ref req "x-forwarded-proto") "https")
+                                    443
+                                    80)))
                             (request-server-port req)))]
    [#t `("SERVER_PROTOCOL" "HTTP/1.1")]
    [#t `("SERVER_SOFTWARE" ,(http-server-software))]
