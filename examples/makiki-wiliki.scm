@@ -7,17 +7,12 @@
 (use makiki.cgi)
 (use gauche.parseopt)
 
-;; makiki-wiliki.cgi contains the wiliki setting to be run as cgi script.
-;; we just include the file, but into a separate module so that it won't
-;; pollute user module.
-(define-module makiki-wiliki
-  (export (rename main main-wiliki))
-  (include "makiki-wiliki.cgi"))
-(import makiki-wiliki)
+(add-load-path "." :relative) ; to load makiki-wiliki.cgi
 
 ;; Makiki's main routine.
 ;; After starting up the server, you can access wiliki with
 ;; <http://localhost:8521/wiliki.cgi>
+;; You may want to adjust log output.
 (define (main args)
   (let-args (cdr args) ([p "port=i" 8521])
     (start-http-server :access-log #t
@@ -27,7 +22,35 @@
 
 ;; This delegates access to "/wiliki.cgi" to the 'main' routine of
 ;; makiki-wiliki.cgi.
+;; :forwarded #t allows this makiki server to run behind reverse proxy.
 (define-http-handler "/wiliki.cgi"
-  (cgi-handler main-wiliki :script-name "/wiliki.cgi"))
+  (cgi-script "makiki-wiliki.cgi"
+              :script-name "/wiliki.cgi" :forwarded #t))
 
 (define-http-handler "/wiliki.css" (file-handler))
+
+;; Reverse Proxy Settings on Apache2
+;;
+;;  You can run this makiki server behind reverse proxy.
+;;
+;;  1. Enable mod_proxy and mod_headers, if you haven't.
+;;
+;;  2. Add ProxyPass, ProxyPassReverse, and RequestHeader directives
+;;     in the Apache conf file:
+;;
+;;  <VirtualHost *:443>
+;;     ...
+;;     ProxyPass         /makiki-wiliki/ http://localhost:8521/ retry=0
+;;     ProxyPassReverse  /makiki-wiliki/ http://localhost:8521/
+;;     RequestHeader set X-Forwarded-Proto https
+;;  </VirtualHost>
+;;  <VirtualHost *:80>
+;;     ...
+;;     ProxyPass         /makiki-wiliki/ http://localhost:8521/ retry=0
+;;     ProxyPassReverse  /makiki-wiliki/ http://localhost:8521/
+;;  </VirtualHost>
+;;
+;;
+;;  After restarting the apache and running makiki-wiliki.scm on port
+;;  8521, you can access it with <https://yourserver/makiki-wiliki/wiliki.cgi>
+;;
