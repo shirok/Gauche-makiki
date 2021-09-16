@@ -38,11 +38,12 @@
            (map (^m
                  (html:tr
                   (html:th (html:tt (x->string m)))
-                  (html:td (html:tt (x->string
-                                     (cgi-get-metavariable (x->string m)))))))
+                  (html:td (html:tt (html-escape-string
+                                     (x->string
+                                      (cgi-get-metavariable (x->string m))))))))
                 *metavariables*))
           (html:h1 "Query parameters")
-          (html:tt (write-to-string params))
+          (html:tt (html-escape-string (write-to-string params)))
           ))))))
 
 ;; Local variables:

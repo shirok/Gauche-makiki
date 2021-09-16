@@ -150,7 +150,7 @@
                                                       [(inet)  AF_INET]
                                                       [(inet6) AF_INET6]
                                                       [else AF_INET])))))]
-   [#t `("REMOTE_HOST"  ,(request-remote-addr req))]
+   ;; REMOTE_HOST - not supported
    ;; REMOTE_IDENT - not supported
    ;; REMOTE_USER - not supported
    [#t `("REQUEST_METHOD" ,(x->string (request-method req)))]

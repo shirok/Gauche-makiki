@@ -7,7 +7,7 @@
 (use gauche.parseopt)
 (use file.util)
 
-(deifne (main args)
+(define (main args)
   (let-args (cdr args) ([p "port=i" 8011])
     (start-http-server :access-log #t
                        :error-log #t
