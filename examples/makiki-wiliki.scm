@@ -23,10 +23,11 @@
 ;; This delegates access to "/wiliki.cgi" to the 'main' routine of
 ;; makiki-wiliki.cgi.
 ;; :forwarded #t allows this makiki server to run behind reverse proxy.
-(define-http-handler "/wiliki.cgi"
+(define-http-handler #/^\/wiliki.cgi(\/.*)?/
   (cgi-script "makiki-wiliki.cgi"
               :script-name "/wiliki.cgi" :forwarded #t))
 
+;; If you serve static content via Makiki, add file-handler for them.
 (define-http-handler "/wiliki.css" (file-handler))
 
 ;; Reverse Proxy Settings on Apache2
