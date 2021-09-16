@@ -134,9 +134,11 @@
     => (^v (list "CONTENT_LENGTH" (x->string v)))]
    [#t `("GATEWAY_INTERFACE" "CGI/1.1")]
    [#t `("PATH_INFO"
-         ,(and-let* ([n (string-prefix-length script-name (request-path req))]
-                     [ (> n (string-length script-name)) ])
-            (string-drop (request-path req) (string-length script-name))))]
+         ,(and (string-prefix? script-name (request-path req))
+               (< (string-length script-name)
+                  (string-length (request-path req)))
+               (string-drop (request-path req)
+                            (string-length script-name))))]
    [#t `("PATH_TRANSLATED" ;todo - flexible path trans.
          ,(string-append (document-root) (request-path req)))]
    [#t `("QUERY_STRING" ,(or (request-query req) ""))]
