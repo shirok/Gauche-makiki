@@ -508,7 +508,7 @@ in Gauche.  Instead of spawning a child process, we load
 Gauche program and call its main routine "in process".
 You have to `(use makiki.cgi)` to use this feature.
 
-    (cgi-script FILE :key ENTRY-POINT SCRIPT-NAME LOAD-EVERY-TIME)
+    (cgi-script FILE :key ENTRY-POINT SCRIPT-NAME LOAD-EVERY-TIME FORWARDED)
 
 Loads the cgi script in FILE, and creates and returns a cgi handler that
 calls a procedure named by ENTRY-POINT inside the script (`main` by default).
@@ -538,7 +538,17 @@ related to the actual pathname of the cgi script file.  The value
 becomes the value of `SCRIPT_NAME` CGI metavariable, and also
 used to calculate `PATH_INFO` CGI metavariable.
 
-    (cgi-handler PROC :key SCRIPT-NAME)
+If you're running Makiki server behind a reverse proxy, give a true
+value to FORWARDED.  Then Makiki adjust SERVER_NAME, SERVER_PORT, and
+HTTPS cgi metavariables according to the external conneciton (between
+the client and the proxy server), instead of the internal connection
+(between the proxy and Makiki).  It is important to produce output
+usnig what the client directly sees; e.g. a link to the same site
+must use the external hostname and port, otherwise the clinent
+can't follow the link.
+
+
+    (cgi-handler PROC :key SCRIPT-NAME FORWARDED)
 
 This is the low-level procedure that creates an http handler that
 sets up the cgi metavariables and calls PROC, that takes one
