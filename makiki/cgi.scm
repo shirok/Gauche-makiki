@@ -134,13 +134,12 @@
     => (^v (list "CONTENT_LENGTH" (x->string v)))]
    [#t `("GATEWAY_INTERFACE" "CGI/1.1")]
    [#t `("PATH_INFO"
-         ,(if (string-prefix? script-name (request-path req))
-            (string-drop (request-path req)
-                         (string-prefix-length script-name (request-path req)))
-            (request-path req)))] ; not correct, but don't know what to do.
+         ,(and-let* ([n (string-prefix-length script-name (request-path req))]
+                     [ (> n (string-length script-name)) ])
+            (string-drop (request-path req) (string-length script-name))))]
    [#t `("PATH_TRANSLATED" ;todo - flexible path trans.
          ,(string-append (document-root) (request-path req)))]
-   [#t `("QUERY_STRING" ,(request-query req))]
+   [#t `("QUERY_STRING" ,(or (request-query req) ""))]
    [#t `("REMOTE_ADDR" ,(or (and forwarded
                                  (request-header-ref req "x-forwarded-for"))
                             (let1 addr (request-remote-addr req)
