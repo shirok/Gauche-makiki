@@ -2,3 +2,5 @@
 /Makefile
 /VERSION
 /config.log
+/test.log
+/test-server.log

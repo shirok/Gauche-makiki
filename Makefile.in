@@ -25,14 +25,14 @@ LOCAL_PATHS = @LOCAL_PATHS@
 # Module-specific stuff
 PACKAGE   = Gauche-makiki
 
-ARCHFILES = 
+ARCHFILES =
 SCMFILES  = $(srcdir)/makiki.scm \
 	    $(srcdir)/makiki/connect.scm \
 	    $(srcdir)/makiki/cgi.scm
-HEADERS   = 
+HEADERS   =
 
 TARGET    = $(ARCHFILES)
-GENERATED = 
+GENERATED =
 CONFIG_GENERATED = Makefile config.cache config.log config.status \
 		   configure.lineno autom4te*.cache $(PACKAGE).gpd
 
@@ -50,13 +50,13 @@ check : all
 
 install : all
 	$(INSTALL) -m 444 -T $(GAUCHE_PKGINCDIR) $(HEADERS)
-	$(INSTALL) -m 444 -T $(GAUCHE_PKGLIBDIR) $(SCMFILES) 
+	$(INSTALL) -m 444 -T $(GAUCHE_PKGLIBDIR) $(SCMFILES)
 	$(INSTALL) -m 555 -T $(GAUCHE_PKGARCHDIR) $(ARCHFILES)
 	$(INSTALL) -m 444 -T $(GAUCHE_PKGLIBDIR)/.packages $(PACKAGE).gpd
 
 uninstall :
 	$(INSTALL) -U $(GAUCHE_PKGINCDIR) $(HEADERS)
-	$(INSTALL) -U $(GAUCHE_PKGLIBDIR) $(SCMFILES) 
+	$(INSTALL) -U $(GAUCHE_PKGLIBDIR) $(SCMFILES)
 	$(INSTALL) -U $(GAUCHE_PKGARCHDIR) $(ARCHFILES)
 	$(INSTALL) -U $(GAUCHE_PKGLIBDIR)/.packages $(PACKAGE).gpd
 
@@ -69,4 +69,3 @@ distclean : clean
 
 maintainer-clean : clean
 	rm -rf $(CONFIG_GENERATED) VERSION
-
