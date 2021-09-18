@@ -14,7 +14,7 @@
                        :port p))
   0)
 
-(define-http-handler "/cgienv.cgi"
+(define-http-handler #/\/cgienv.cgi(\/.*)?/
   (cgi-script (build-path (sys-dirname (current-load-path))
                           "cgienv.cgi")
               :script-name "/cgienv.cgi" :forwarded #t))
