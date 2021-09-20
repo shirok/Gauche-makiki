@@ -57,7 +57,7 @@
                  (html:head (html:title "echo-header"))
                  (html:body (html:h1 "Request headers")
                             (html:pre
-                             (map (^p (map (^v #`",(car p): ,v\n") (cdr p)))
+                             (map (^p (map (^v #"~(car p): ~v\n") (cdr p)))
                                   (request-headers req))))))))
 
 ;; Local variables:

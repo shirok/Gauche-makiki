@@ -88,7 +88,7 @@
 ($ call-with-server "tests/file.scm"
    (^[p s t]
      (define (file-test path ctype)
-       (receive (code hdrs body) (http-get s #`"/,path")
+       (receive (code hdrs body) (http-get s #"/~path")
          (test* (format "file test ~s" path) `("200" ,ctype #t)
                 (list code (rfc822-header-ref hdrs "content-type")
                       (equal? (file->string path) body)))))
@@ -108,11 +108,11 @@
 (define (test-cgi-stuff server-file)
   ($ call-with-server server-file
      (^[p s t]
-       (test* #`"(,server-file) empty parameters" (get-environment-variables)
+       (test* #"(~server-file) empty parameters" (get-environment-variables)
               (assq-ref (read-from-string (values-ref (http-get s "/") 2))
                         'environments)
               (cut lset= equal? <> <>))
-       (test* #`"(,server-file )with parameters"
+       (test* #"(~server-file) with parameters"
               '(("a" ")(!#%%$!*^({}<>" "wat?") ("b" ""))
               (assq-ref (read-from-string
                          (values-ref (http-get s '("/"
