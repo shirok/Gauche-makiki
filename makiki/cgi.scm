@@ -168,6 +168,7 @@
    [#t `("SERVER_PROTOCOL" "HTTP/1.1")]
    [#t `("SERVER_SOFTWARE" ,(http-server-software))]
    [(request-header-ref req "referer") => (^r `("HTTP_REFERER" ,r))]
+   [(request-header-ref req "cookie") => (^c `("HTTP_COOKIE" ,c))]
    ;; NB: For now, Makiki itself isn't capable of serving https, so
    ;; this only happens when it is behind a reverse proxy.
    [(and forwarded
