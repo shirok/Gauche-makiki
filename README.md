@@ -510,8 +510,16 @@ You have to `(use makiki.cgi)` to use this feature.
 
     (cgi-script FILE :key ENTRY-POINT SCRIPT-NAME LOAD-EVERY-TIME FORWARDED)
 
-Loads the cgi script in FILE, and creates and returns a cgi handler that
+Loads the cgi script in FILE, and creates and returns an http handler that
 calls a procedure named by ENTRY-POINT inside the script (`main` by default).
+
+The return value can be used as the handler argument for `define-http-handler`,
+as follows:
+
+    (define-http-handler #/\/foo.cgi(\/.*)?/
+      (cgi-script (build-path (sys-dirname (current-load-path))
+                              "foo.cgi")
+                  :script-name "/foo.cgi" :forwarded #t))
 
 To avoid interference with makiki itself, the script is loaded
 into an independent, anonymous module.
