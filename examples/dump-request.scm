@@ -10,6 +10,7 @@
 (add-load-path ".." :relative)
 (use makiki)
 (use gauche.parseopt)
+(use gauche.uvector)
 
 (define (main args)
   (let-args (cdr args) ([port "p|port=i" 8012])
@@ -23,7 +24,7 @@
   (print #"URI: ~(~ req'uri)")
   (print #"Headers:")
   (pprint (~ req'headers))
-  (and-let1 len (request-header-ref req "content-length")
+  (and-let1 len (x->integer (request-header-ref req "content-length"))
     (let1 z (read-uvector <u8vector> len (request-iport req))
       (print "Body:")
       (display z)
