@@ -1,0 +1,22 @@
+name: Build and test
+
+on: [push, pull_request]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GET_GAUCHE_URL: https://raw.githubusercontent.com/shirok/get-gauche/master
+    steps:
+    - uses: actions/checkout@v3
+    - name: Install dependencies
+      run: |
+        curl -f -o get-gauche.sh $GET_GAUCHE_URL/get-gauche.sh
+        chmod +x get-gauche.sh
+        ./get-gauche.sh --sudo --auto --skip-tests --prefix=/usr
+    - name: Build and check
+      run: |
+        ./configure
+        make
+        make -s check

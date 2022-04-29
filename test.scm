@@ -279,4 +279,4 @@
 (test-module 'makiki.cgi)
 
 ;; epilogue
-(test-end)
+(test-end :exit-on-failure #t)
