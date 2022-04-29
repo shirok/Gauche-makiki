@@ -5,7 +5,7 @@
   :providing-modules (makiki)
   :maintainers ("shiro@acm.org")
   :authors ("Shiro Kawai <shiro@acm.org>")
-  :homepage "http://github.com/shirok/Gauche-makiki"
+  :homepage "https://github.com/shirok/Gauche-makiki"
   :repository "https://github.com/shirok/Gauche-makiki"
   :licenses ("BSD")
   )
