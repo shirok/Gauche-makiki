@@ -8,7 +8,7 @@ jobs:
     timeout-minutes: 10
     steps:
     - uses: actions/checkout@v3
-    - uses: shirok/setup-gauche@v1
+    - uses: shirok/setup-gauche@v3
     - name: Build and check
       run: |
         ./configure
