@@ -1,5 +1,5 @@
-(use makiki)
 (use gauche.parseopt)
+(use makiki)
 
 (define-http-handler #/^\/.*$/ (file-handler))
 

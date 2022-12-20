@@ -2,15 +2,15 @@
 ;;; Test makiki
 ;;;
 
-(use gauche.test)
-(use gauche.process)
-(use gauche.parameter)
-(use gauche.net)
-(use rfc.http)
-(use rfc.822)
 (use file.util)
-(use srfi-1)
-(use srfi-98)
+(use gauche.net)
+(use gauche.parameter)
+(use gauche.process)
+(use gauche.test)
+(use rfc.822)
+(use rfc.http)
+(use scheme.list)
+(use srfi.98)
 
 (test-start "makiki")
 (use makiki)

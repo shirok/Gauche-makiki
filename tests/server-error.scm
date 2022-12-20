@@ -1,6 +1,6 @@
-(use makiki)
 (use gauche.parameter)
 (use gauche.parseopt)
+(use makiki)
 
 (define (main args)
   (let-args (cdr args) ([p "port=i"])

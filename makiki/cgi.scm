@@ -38,14 +38,14 @@
 ;; makiki, so there's little use of this module for new projects.
 
 (define-module makiki.cgi
-  (use gauche.vport)
+  (use gauche.net)
   (use gauche.parameter)
   (use gauche.uvector)
-  (use gauche.net)
-  (use srfi-13)
-  (use rfc.822)
-  (use www.cgi)
+  (use gauche.vport)
   (use makiki)
+  (use rfc.822)
+  (use srfi.13)
+  (use www.cgi)
   (export cgi-handler cgi-script))
 (select-module makiki.cgi)
 

@@ -1,6 +1,6 @@
+(use gauche.parseopt)
 (use makiki)
 (use makiki.cgi)
-(use gauche.parseopt)
 
 (load "tests/env.scm")
 (define env-main main)

@@ -1,6 +1,6 @@
-(use makiki)
 (use gauche.parseopt)
 (use gauche.uvector)
+(use makiki)
 (use rfc.json)
 
 (define (main args)

@@ -38,9 +38,9 @@
 ;; examples/proxy.scm
 
 (define-module makiki.connect
+  (use gauche.net)
   (use gauche.selector)
   (use gauche.uvector)
-  (use gauche.net)
   (use makiki)
   (export connect-dispatcher))
 (select-module makiki.connect)

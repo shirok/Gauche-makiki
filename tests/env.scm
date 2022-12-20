@@ -1,9 +1,9 @@
 ;; A test for cgi-handler.
 ;; This script is loaded into makiki server
 
-(use srfi-98)
-(use www.cgi)
+(use srfi.98)
 (use text.html-lite)
+(use www.cgi)
 
 (define (main args)
   (cgi-main

@@ -1,7 +1,7 @@
 ;; Returning customized body with non-200 response
 
-(use makiki)
 (use gauche.parseopt)
+(use makiki)
 
 (define (main args)
   (let-args (cdr args) ([p "port=i"])
