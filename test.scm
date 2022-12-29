@@ -4,7 +4,6 @@
 
 (use file.util)
 (use gauche.net)
-(use gauche.parameter)
 (use gauche.process)
 (use gauche.test)
 (use rfc.822)

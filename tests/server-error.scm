@@ -1,4 +1,3 @@
-(use gauche.parameter)
 (use gauche.parseopt)
 (use makiki)
 

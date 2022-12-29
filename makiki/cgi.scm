@@ -39,7 +39,6 @@
 
 (define-module makiki.cgi
   (use gauche.net)
-  (use gauche.parameter)
   (use gauche.uvector)
   (use gauche.vport)
   (use makiki)

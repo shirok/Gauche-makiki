@@ -39,7 +39,6 @@
   (use gauche.generator)
   (use gauche.logger)
   (use gauche.net)
-  (use gauche.parameter)
   (use gauche.record)
   (use gauche.selector)
   (use gauche.threads)
