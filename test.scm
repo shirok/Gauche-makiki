@@ -14,6 +14,8 @@
 (test-start "makiki")
 (use makiki)
 (test-module 'makiki)
+(use makiki.subserver)
+(test-module 'makiki.subserver)
 
 (define (call-with-server path proc)
   (let* ([p (run-process `(gosh "-I." ,path "--port" 0)
