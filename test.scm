@@ -276,8 +276,5 @@
 (use makiki.connect)
 (test-module 'makiki.connect)
 
-(use makiki.cgi)
-(test-module 'makiki.cgi)
-
 ;; epilogue
 (test-end :exit-on-failure #t)
