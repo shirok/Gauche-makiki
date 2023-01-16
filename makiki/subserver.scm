@@ -91,18 +91,16 @@
   (let* ([p (run-process `(gosh "-I." ,server-script "--port" 0)
                             :output :pipe :error :pipe :wait #f)]
          [port (or (get-port p)
-                   (error "Failed to start server script: " server-script))]
-         [host #"localhost:~port"])
-    (unwind-protect (proc p host port)
+                   (error "Failed to start server script: " server-script))])
+    (unwind-protect (proc port)
       (process-kill p))))
 
 (define (call-with-httpd/wait server-script proc)
   (let* ([p (run-process `(gosh "-I." ,server-script "--port" 0)
                          :output :pipe :error :pipe :wait #f)]
          [port (or (get-port p)
-                   (error "Failed to start server script: " server-script))]
-         [host #"localhost:~port"])
-    (proc p host port)
+                   (error "Failed to start server script: " server-script))])
+    (proc port)
     (process-wait p)
     (sys-wait-exit-status (process-exit-status p))))
 

@@ -21,18 +21,19 @@
 (test-section "basic functionality")
 
 ($ call-with-httpd "tests/basic.scm"
-   (^[p s t]
+   (^[port]
+     (define s #"localhost:~port")
      (test* "basic responds 404" "404"
             (values-ref (http-get s "/") 0))
 
      (test* "bad request format" (eof-object)
-            (let1 s (make-client-socket 'inet "localhost" t)
+            (let1 s (make-client-socket 'inet "localhost" port)
               (socket-shutdown s SHUT_WR)
               (unwind-protect (read-line (socket-input-port s))
                 (socket-close s))))
 
      (test* "bad request format" "HTTP/1.1 501 Not Implemented"
-            (let1 s (make-client-socket 'inet "localhost" t)
+            (let1 s (make-client-socket 'inet "localhost" port)
               (unwind-protect
                   (begin
                     (display "ZZZZ /foo.txt HTTP/1.1\r\n" (socket-output-port s))
@@ -45,14 +46,15 @@
 (test-section "request methods")
 
 ($ call-with-httpd "tests/methods.scm"
-   (^[p s t]
+   (^[port]
+     (define s #"localhost:~port")
      (test* "GET"    "get"    (values-ref (http-get s "/") 2))
      (test* "POST"   "post"   (values-ref (http-post s "/" "") 2))
      (test* "PUT"    "put"    (values-ref (http-put s "/" "") 2))
      (test* "DELETE" "delete" (values-ref (http-delete s "/") 2))
 
      (test* "OPTIONS" "HTTP/1.1 404 Not Found"
-            (let1 s (make-client-socket 'inet "localhost" t)
+            (let1 s (make-client-socket 'inet "localhost" port)
               (unwind-protect
                   (begin
                     (display "OPTIONS / HTTP/1.1\r\n" (socket-output-port s))
@@ -65,7 +67,8 @@
 (test-section "file-handler")
 
 ($ call-with-httpd "tests/file.scm"
-   (^[p s t]
+   (^[port]
+     (define s #"localhost:~port")
      (define (file-test path ctype)
        (receive (code hdrs body) (http-get s #"/~path")
          (test* (format "file test ~s" path) `("200" ,ctype #t)
@@ -86,7 +89,8 @@
 
 (define (test-cgi-stuff server-file)
   ($ call-with-httpd server-file
-     (^[p s t]
+     (^[port]
+       (define s #"localhost:~port")
        (test* #"(~server-file) empty parameters" (get-environment-variables)
               (assq-ref (read-from-string (values-ref (http-get s "/") 2))
                         'environments)
@@ -110,7 +114,8 @@
 (test-section "customized respond/ng body")
 
 ($ call-with-httpd "tests/customized-ng.scm"
-   (^[p s t]
+   (^[port]
+     (define s #"localhost:~port")
      (test* "custom 404 response body"
             '("404" "text/html; charset=utf-8"
               "<html><title>404 Not found</title><body><p>I don't have that!</p></body></html>")
@@ -118,7 +123,8 @@
               (list code (rfc822-header-ref hdrs "content-type") body)))))
 
 ($ call-with-httpd "tests/customized-ng.scm"
-   (^[p s t]
+   (^[port]
+     (define s #"localhost:~port")
      (test* "error in custom 404 response body"
             '("404" "text/plain; charset=utf-8"
               "Not Found")
@@ -126,7 +132,8 @@
               (list code (rfc822-header-ref hdrs "content-type") body)))))
 
 ($ call-with-httpd "tests/customized-ng.scm"
-   (^[p s t]
+   (^[port]
+     (define s #"localhost:~port")
      (test* "request-error condition"
             '("400" "application/json; charset=utf-8"
               "{\"message\":\"boo!\"}")
@@ -137,7 +144,8 @@
 (test-section "sxml template")
 
 ($ call-with-httpd "tests/sxml-tmpl.scm"
-   (^[p s t]
+   (^[port]
+     (define s #"localhost:~port")
      (test* "sxml-tmpl"
             "<html><body><p>Yo, Keoki.  Howzit?</p></body></html>"
             (values-ref (http-get s "/?g=2&name=Keoki") 2))))
@@ -146,7 +154,8 @@
 (test-section "json")
 
 ($ call-with-httpd "tests/json-server.scm"
-   (^[p s t]
+   (^[port]
+     (define s #"localhost:~port")
      (test* "json request/response" "{\"count\":0}"
             (values-ref (http-get s "/") 2))
      (test* "json request/response" "{\"count\":101}"
@@ -165,7 +174,8 @@
 (use rfc.cookie)
 
 ($ call-with-httpd "tests/let-params.scm"
-   (^[p s t]
+   (^[port]
+     (define s #"localhost:~port")
      (define (req path . args)
        (read-from-string (values-ref (apply http-get s path args) 2)))
      (parameterize ([http-user-agent "makiki-test"])
@@ -183,7 +193,8 @@
 (test-section "server error handler")
 
 ($ call-with-httpd "tests/server-error.scm"
-   (^[p s t]
+   (^[port]
+     (define s #"localhost:~port")
      (test* "server error handler" '("500" "Internal Server Error")
             (receive (status hdrs body) (http-get s "/?foo=z")
               (list status body)))
@@ -219,11 +230,11 @@
 
 (test* "/a" 1
        ($ call-with-httpd/wait "tests/termination.scm"
-          (^[p s t] (http-get s "/a"))))
+          (^[port] (http-get #"localhost:~port" "/a"))))
 
 (test* "/b" 2
        ($ call-with-httpd/wait "tests/termination.scm"
-          (^[p s t] (http-get s "/b"))))
+          (^[port] (http-get #"localhost:~port" "/b"))))
 
 ;;;
 (test-section "profiling")
@@ -236,14 +247,14 @@
              (begin
                (sys-unlink *profiler.out*)
                ($ call-with-httpd "tests/profiler.scm"
-                  (^[p s t] (http-get s "/profile")))
+                  (^[port] (http-get #"localhost:~port" "/profile")))
                (and (file-exists? *profiler.out*)
                     (> (file-size *profiler.out*) 0))))
       (test* "profile output" #f
              (begin
                (sys-unlink *profiler.out*)
                ($ call-with-httpd "tests/profiler.scm"
-                  (^[p s t] (http-get s "/noprofile")))
+                  (^[port] (http-get #"localhost:~port" "/noprofile")))
                (and (file-exists? *profiler.out*)
                     (> (file-size *profiler.out*) 0)))))
   (sys-unlink *profiler.out*))
