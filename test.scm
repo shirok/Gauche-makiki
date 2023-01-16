@@ -17,32 +17,10 @@
 (use makiki.subserver)
 (test-module 'makiki.subserver)
 
-(define (call-with-server path proc)
-  (let* ([p (run-process `(gosh "-I." ,path "--port" 0)
-                            :output :pipe :error :pipe :wait #f)]
-         [port (get-port p path)]
-         [host #"localhost:~port"])
-    (unwind-protect (proc p host port)
-      (process-kill p))))
-
-(define (call-with-server/exit-status path proc)
-  (let* ([p (run-process `(gosh "-I." ,path "--port" 0)
-                         :output :pipe :error :pipe :wait #f)]
-         [port (get-port p path)]
-         [host #"localhost:~port"])
-    (proc p host port)
-    (process-wait p)
-    (sys-wait-exit-status (process-exit-status p))))
-
-(define (get-port proc path)
-  (rxmatch-case (read-line (process-error proc))
-    [#/started on \(.*:(\d+)\)/i (_ pp) (x->integer pp)]
-    [else => (cut errorf "failed to start server script ~s: ~a" path <>)]))
-
 ;;;
 (test-section "basic functionality")
 
-($ call-with-server "tests/basic.scm"
+($ call-with-httpd "tests/basic.scm"
    (^[p s t]
      (test* "basic responds 404" "404"
             (values-ref (http-get s "/") 0))
@@ -66,7 +44,7 @@
 ;;;
 (test-section "request methods")
 
-($ call-with-server "tests/methods.scm"
+($ call-with-httpd "tests/methods.scm"
    (^[p s t]
      (test* "GET"    "get"    (values-ref (http-get s "/") 2))
      (test* "POST"   "post"   (values-ref (http-post s "/" "") 2))
@@ -86,7 +64,7 @@
 ;;;
 (test-section "file-handler")
 
-($ call-with-server "tests/file.scm"
+($ call-with-httpd "tests/file.scm"
    (^[p s t]
      (define (file-test path ctype)
        (receive (code hdrs body) (http-get s #"/~path")
@@ -107,7 +85,7 @@
 (test-module 'makiki.cgi)
 
 (define (test-cgi-stuff server-file)
-  ($ call-with-server server-file
+  ($ call-with-httpd server-file
      (^[p s t]
        (test* #"(~server-file) empty parameters" (get-environment-variables)
               (assq-ref (read-from-string (values-ref (http-get s "/") 2))
@@ -131,7 +109,7 @@
 ;;;
 (test-section "customized respond/ng body")
 
-($ call-with-server "tests/customized-ng.scm"
+($ call-with-httpd "tests/customized-ng.scm"
    (^[p s t]
      (test* "custom 404 response body"
             '("404" "text/html; charset=utf-8"
@@ -139,7 +117,7 @@
             (receive (code hdrs body) (http-get s "/")
               (list code (rfc822-header-ref hdrs "content-type") body)))))
 
-($ call-with-server "tests/customized-ng.scm"
+($ call-with-httpd "tests/customized-ng.scm"
    (^[p s t]
      (test* "error in custom 404 response body"
             '("404" "text/plain; charset=utf-8"
@@ -147,7 +125,7 @@
             (receive (code hdrs body) (http-get s "/favicon.ico")
               (list code (rfc822-header-ref hdrs "content-type") body)))))
 
-($ call-with-server "tests/customized-ng.scm"
+($ call-with-httpd "tests/customized-ng.scm"
    (^[p s t]
      (test* "request-error condition"
             '("400" "application/json; charset=utf-8"
@@ -158,7 +136,7 @@
 ;;;
 (test-section "sxml template")
 
-($ call-with-server "tests/sxml-tmpl.scm"
+($ call-with-httpd "tests/sxml-tmpl.scm"
    (^[p s t]
      (test* "sxml-tmpl"
             "<html><body><p>Yo, Keoki.  Howzit?</p></body></html>"
@@ -167,7 +145,7 @@
 ;;;
 (test-section "json")
 
-($ call-with-server "tests/json-server.scm"
+($ call-with-httpd "tests/json-server.scm"
    (^[p s t]
      (test* "json request/response" "{\"count\":0}"
             (values-ref (http-get s "/") 2))
@@ -186,7 +164,7 @@
 
 (use rfc.cookie)
 
-($ call-with-server "tests/let-params.scm"
+($ call-with-httpd "tests/let-params.scm"
    (^[p s t]
      (define (req path . args)
        (read-from-string (values-ref (apply http-get s path args) 2)))
@@ -204,7 +182,7 @@
 ;;;
 (test-section "server error handler")
 
-($ call-with-server "tests/server-error.scm"
+($ call-with-httpd "tests/server-error.scm"
    (^[p s t]
      (test* "server error handler" '("500" "Internal Server Error")
             (receive (status hdrs body) (http-get s "/?foo=z")
@@ -240,11 +218,11 @@
 (test-section "server termination")
 
 (test* "/a" 1
-       ($ call-with-server/exit-status "tests/termination.scm"
+       ($ call-with-httpd/wait "tests/termination.scm"
           (^[p s t] (http-get s "/a"))))
 
 (test* "/b" 2
-       ($ call-with-server/exit-status "tests/termination.scm"
+       ($ call-with-httpd/wait "tests/termination.scm"
           (^[p s t] (http-get s "/b"))))
 
 ;;;
@@ -257,14 +235,14 @@
       (test* "profile output" #t
              (begin
                (sys-unlink *profiler.out*)
-               ($ call-with-server "tests/profiler.scm"
+               ($ call-with-httpd "tests/profiler.scm"
                   (^[p s t] (http-get s "/profile")))
                (and (file-exists? *profiler.out*)
                     (> (file-size *profiler.out*) 0))))
       (test* "profile output" #f
              (begin
                (sys-unlink *profiler.out*)
-               ($ call-with-server "tests/profiler.scm"
+               ($ call-with-httpd "tests/profiler.scm"
                   (^[p s t] (http-get s "/noprofile")))
                (and (file-exists? *profiler.out*)
                     (> (file-size *profiler.out*) 0)))))
