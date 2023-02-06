@@ -66,7 +66,8 @@
     (error "Server file path rquired for the fist call."))
   (unless *server-module*
     (set! *server-module* (make-module '#:makiki-dev)))
-  (load path :environment *server-module*)
+  (load (sys-normalize-pathname path :absolute #t :expand #t)
+        :environment *server-module*)
   (unless *server-thread*
     (set! *server-thread*
           (thread-start!
