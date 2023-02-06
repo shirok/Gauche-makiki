@@ -44,7 +44,7 @@
 ;; This will eventually be in Gauche.  To make this module work with
 ;; the current release of Gauche, we duplicate the code here.
 ;; Remove this later.
-(define (open-tapping-port iport oport :key (close-output #f))
+(define (open-tapping-input-port iport oport :key (close-output #f))
   (define mtq (make-mtqueue))
   (define tee-closed #f)
   (define straight-closed #f)
@@ -105,8 +105,8 @@
     (sys-wait-exit-status (process-exit-status p))))
 
 (define (get-port process)
-  (let1 port (open-tapping-port (process-error process)
-                                (current-output-port))
+  (let1 port (open-tapping-input-port (process-error process)
+                                      (current-output-port))
     (rxmatch-case (read-line port)
       [#/started on \(.*:(\d+)\)/i (_ pp)
                  (close-input-port port)

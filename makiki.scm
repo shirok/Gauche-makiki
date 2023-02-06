@@ -371,7 +371,7 @@
 ;;  (file <filename>)
 ;;  (plain <object>)
 ;;  (json <alist-or-vector>)
-;;  (sxml <sxml>)
+;;  (sxml <sxml> . <subst-alist>)
 ;;  (chunks <chunk> ...)
 ;;  <text-tree>
 ;;

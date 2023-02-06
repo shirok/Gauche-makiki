@@ -29,6 +29,7 @@ ARCHFILES =
 SCMFILES  = $(srcdir)/makiki.scm \
 	    $(srcdir)/makiki/connect.scm \
 	    $(srcdir)/makiki/cgi.scm \
+	    $(srcdir)/makiki/dev.scm \
 	    $(srcdir)/makiki/subserver.scm
 HEADERS   =
 
