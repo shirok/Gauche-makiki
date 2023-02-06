@@ -61,7 +61,7 @@
 (define *server-thread* #f)
 
 ;; API
-(define (start-server! :optional (path *last-server-file*))
+(define (start-server! :optional (path *server-file*))
   (unless path
     (error "Server file path rquired for the fist call."))
   (unless *server-module*

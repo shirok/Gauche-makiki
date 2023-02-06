@@ -16,7 +16,6 @@
 (test-module 'makiki)
 (use makiki.subserver)
 (test-module 'makiki.subserver)
-
 ;;;
 (test-section "basic functionality")
 
@@ -264,6 +263,9 @@
 
 (use makiki.connect)
 (test-module 'makiki.connect)
+
+(use makiki.dev)
+(test-module 'makiki.dev)
 
 ;; epilogue
 (test-end :exit-on-failure #t)
