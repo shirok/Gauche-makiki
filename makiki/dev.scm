@@ -50,7 +50,7 @@
 (define-module makiki.dev
   (use gauche.threads)
   (use makiki)
-  (export start-server stop-server))
+  (export start-server! stop-server!))
 (select-module makiki.dev)
 
 ;; Those APIs are supposed to be called interactively in REPL, so
@@ -61,7 +61,7 @@
 (define *server-thread* #f)
 
 ;; API
-(define (start-server :optional (path *last-server-file*))
+(define (start-server! :optional (path *last-server-file*))
   (unless path
     (error "Server file path rquired for the fist call."))
   (unless *server-module*
@@ -76,7 +76,7 @@
   *server-thread*)
 
 ;; API
-(define (stop-server)
+(define (stop-server!)
   (when *server-thread*
     (thread-terminate! *server-thread*)
     (set! *server-thread* #f))
