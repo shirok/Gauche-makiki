@@ -481,7 +481,14 @@
 ;;; Handler mechanism
 ;;;
 
+;; We use a queue simply to add new handler at the end of list, so that
+;; the one defined earlier takes precedence.  NB: This may be changed
+;; in future.
 (define *handlers* (make-mtqueue))
+
+;; This is for The dev-time convenience.  Clear the handler list before
+;; reloading the script.
+(define (clear-handlers!) (set! *handlers* (make-mtqueue)))
 
 ;; The server program registers appropriate handlers.
 ;;

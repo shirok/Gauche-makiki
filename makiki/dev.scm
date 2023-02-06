@@ -63,9 +63,12 @@
 ;; API
 (define (start-server! :optional (path *server-file*))
   (unless path
-    (error "Server file path rquired for the fist call."))
+    (error "Server file path rquired for the first call."))
+  (set! *server-file* path)
   (unless *server-module*
     (set! *server-module* (make-module '#:makiki-dev)))
+  ;; Kludge - clear the existing handlers.  This isn't a public API.
+  ((with-module makiki clear-handlers!))
   (load (sys-normalize-pathname path :absolute #t :expand #t)
         :environment *server-module*)
   (unless *server-thread*
