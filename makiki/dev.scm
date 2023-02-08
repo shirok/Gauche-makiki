@@ -74,14 +74,26 @@
   (unless *server-thread*
     (set! *server-thread*
           (thread-start!
-           (make-thread (^[]
-                          ((global-variable-ref *server-module* 'main)
-                           `(,path)))))))
+           (make-thread (cut %run-server! *server-module* path)))))
   *server-thread*)
+
+(define (%run-server! mod server-file)
+  (cond [(global-variable-ref mod 'dev-main #f)
+         => (^[dev-main] (dev-main `(,server-file)))]
+        [(global-variable-ref mod 'main #f)
+         => (^[main] (main `(,server-file)))]
+        [else (error "Can't find 'dev-main' nor 'main' in the server script:"
+                     server-file)]))
 
 ;; API
 (define (stop-server!)
   (when *server-thread*
+    (%shutdown-server! *server-module*)
     (thread-terminate! *server-thread*)
     (set! *server-thread* #f))
   #t)
+
+(define (%shutdown-server! mod)
+  (cond [(global-variable-ref mod 'dev-shutdown #f)
+         => (^[dev-shutdown] (dev-shutdown))]
+        [else #f]))
