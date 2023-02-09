@@ -562,20 +562,17 @@
 ;; this as an opaque object.
 (define (make-server-control-channel)
   (receive (t-in t-out) (sys-pipe)
-    (^[msg]
-      (case msg
+    (define value #f)
+    (^[msg . args]
+      (ecase msg
         [(get-channel) t-in]
-        [(request-termination) (newline t-out)]))))
-
-;; Queue to hold exit-value.  NB: Only the first exit-value of the
-;; queue is considered.  We use mtqueue merely to avoid race condition.
-(define exit-value-queue (make-parameter #f))
+        [(get-value) value]
+        [(request-termination) (set! value (car args)) (newline t-out)]))))
 
 ;; API
 ;; Request termination of the server loop
 (define (terminate-server-loop control-channel exit-value)
-  (enqueue! (exit-value-queue) exit-value)
-  (control-channel 'request-termination))
+  (control-channel 'request-termination exit-value))
 
 ;;;
 ;;; Main loop
@@ -599,14 +596,14 @@
   ;; see initial-log-drain for the possible values of access-log and error-log.
   (parameterize ([access-log-drain (initial-log-drain alog 'access-log)]
                  [error-log-drain (initial-log-drain elog 'error-log)]
-                 [document-root docroot]
-                 [exit-value-queue (make-mtqueue)])
+                 [document-root docroot])
     (let* ([pool (tpool:make-thread-pool num-threads :max-backlog max-backlog)]
            [tlog (kick-logger-thread pool forwarded?)]
            [ssocks (if path
                      (list (make-server-socket 'unix path))
                      (make-server-sockets host port :reuse-addr? #t))]
-           [looping #t])
+           [looping #t]
+           [exit-value 0])
       (guard (e [(and (<unhandled-signal-error> e)
                       (memv (~ e'signal) `(,SIGINT ,SIGTERM)))
                  (access-log "Shutdown by signal ~a" (~ e'signal))]
@@ -620,16 +617,16 @@
                    '(r)))
               (when control-channel
                 (selector-add! sel (control-channel 'get-channel)
-                               (^[fd condition] (set! looping #f))
+                               (^[fd condition]
+                                 (set! looping #f)
+                                 (set! exit-value (control-channel 'get-value)))
                                '(r)))
               (when startup-callback (startup-callback ssocks))
               (access-log "Started on ~a"
                           (map (.$ sockaddr-name socket-address) ssocks))
               ;; Main loop
               (while looping (selector-select sel))
-              (if (queue-empty? (exit-value-queue))
-                0
-                (dequeue! (exit-value-queue))))
+              exit-value)
           (access-log "Server terminating...")
           (for-each %socket-discard ssocks)
           (tpool:terminate-all! pool :force-timeout 300)
