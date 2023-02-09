@@ -60,6 +60,9 @@
 (define *server-module* #f)
 (define *server-thread* #f)
 
+;; a hidden parameter to stop the server loop
+(define dev-cch (with-module makiki dev-control-channel))
+
 ;; API
 (define (start-server! :optional (path *server-file*))
   (unless path
@@ -72,6 +75,7 @@
   (load (sys-normalize-pathname path :absolute #t :expand #t)
         :environment *server-module*)
   (unless *server-thread*
+    (dev-cch (make-server-control-channel))
     (set! *server-thread*
           (thread-start!
            (make-thread (cut %run-server! *server-module* path)))))
@@ -88,7 +92,10 @@
 ;; API
 (define (stop-server!)
   (when *server-thread*
+    (terminate-server-loop (dev-cch) 0)
+    (sys-nanosleep #e1e8)               ;for now; better to handshake
     (%shutdown-server! *server-module*)
+    (dev-cch #f)
     (thread-terminate! *server-thread*)
     (set! *server-thread* #f))
   #t)

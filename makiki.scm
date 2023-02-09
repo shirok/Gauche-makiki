@@ -100,6 +100,10 @@
 (define profiler-output (make-parameter (sys-getenv "MAKIKI_PROFILER_OUTPUT")))
 (define debugging (make-parameter (sys-getenv "MAKIKI_DEBUGGING")))
 
+;; This is for development.  An implicit side-channel to stop the server.
+;; Not for general use.
+(define dev-control-channel (make-shared-parameter #f))
+
 ;;;
 ;;; Logging
 ;;;
@@ -615,12 +619,13 @@
                    (^[fd condition]
                      (accept-client app-data (socket-accept s) pool))
                    '(r)))
-              (when control-channel
-                (selector-add! sel (control-channel 'get-channel)
-                               (^[fd condition]
-                                 (set! looping #f)
-                                 (set! exit-value (control-channel 'get-value)))
-                               '(r)))
+              (dolist [cch (list control-channel (dev-control-channel))]
+                (when cch
+                  (selector-add! sel (cch 'get-channel)
+                                 (^[fd condition]
+                                   (set! looping #f)
+                                   (set! exit-value (cch 'get-value)))
+                                 '(r))))
               (when startup-callback (startup-callback ssocks))
               (access-log "Started on ~a"
                           (map (.$ sockaddr-name socket-address) ssocks))
