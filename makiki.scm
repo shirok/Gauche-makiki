@@ -102,7 +102,7 @@
 
 ;; This is for development.  An implicit side-channel to stop the server.
 ;; Not for general use.
-(define dev-control-channel (make-shared-parameter #f))
+(define dev-control-channel (make-parameter #f))
 
 ;;;
 ;;; Logging
