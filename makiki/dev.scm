@@ -31,22 +31,6 @@
 ;; EXPERIMENTAL
 
 ;; Load and run makiki service in subthread for development
-
-;; We assume the server script has 'main' procedure that
-;; calls start-http-server to enter server loop.  START-SERVER loads
-;; that script in an isolated module and calls 'main' in a thread.
-;; This has a few drawbacks.
-;; - There's no consistent way to specify various options of
-;;   the server, e.g. ports.  It all depends on how the script
-;;   interpret its arguments, which depends on the script.
-;; - There's no way to stop the server that's guaranteed to be safe.
-;; - Reloading doesn't stop the server thread.  Change of handlers
-;;   would be reflected, but changes in the main procedure, or the
-;;   app structure passed to the start-http-server, won't take effect.
-;;
-;; The Right thing would be to define a proper protocol in start-http-server
-;; so that it can be run in 'dev mode'.
-
 (define-module makiki.dev
   (use gauche.threads)
   (use makiki)
@@ -57,8 +41,12 @@
 ;; we don't care about thread safety for now.
 
 (define *server-file* #f)
-(define *server-module* #f)
 (define *server-thread* #f)
+
+;; A module where the script is loaded.
+;; We use named module, so that the user can switch into this module in REPL.
+(define-module makiki.user)
+(define *server-module* (find-module 'makiki.user))
 
 ;; a hidden parameter to stop the server loop
 (define dev-cch (with-module makiki dev-control-channel))
@@ -68,26 +56,33 @@
   (unless path
     (error "Server file path rquired for the first call."))
   (set! *server-file* path)
-  (unless *server-module*
-    (set! *server-module* (make-module '#:makiki-dev)))
   ;; Kludge - clear the existing handlers.  This isn't a public API.
   ((with-module makiki clear-handlers!))
   (load (sys-normalize-pathname path :absolute #t :expand #t)
         :environment *server-module*)
-  (unless *server-thread*
+  (unless (and (thread? *server-thread*)
+               (not (eq? (thread-state *server-thread*) 'terminated)))
     (dev-cch (make-server-control-channel))
     (set! *server-thread*
           (thread-start!
            (make-thread (cut %run-server! *server-module* path)))))
   *server-thread*)
 
+;; Called in a separate thread.  Run 'dev-main if it exists; otherwise,
+;; run 'main'.
 (define (%run-server! mod server-file)
-  (cond [(global-variable-ref mod 'dev-main #f)
-         => (^[dev-main] (dev-main `(,server-file)))]
-        [(global-variable-ref mod 'main #f)
-         => (^[main] (main `(,server-file)))]
-        [else (error "Can't find 'dev-main' nor 'main' in the server script:"
-                     server-file)]))
+  (guard (e [else
+             (report-error e)
+             #f])
+    (cond [(global-variable-ref mod 'dev-main #f)
+           => (^[dev-main] (dev-main `(,server-file)))]
+          [(global-variable-ref mod 'main #f)
+           => (^[main] (main `(,server-file)))]
+          [else
+           (format (current-error-port)
+                   "Can't find 'dev-main' nor 'main' in the server script: ~s\n"
+                   server-file)
+           #f])))
 
 ;; API
 (define (stop-server!)
