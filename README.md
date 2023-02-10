@@ -56,6 +56,9 @@ the `app` argument holds the application state you pass to
 state.  See [this BBS example](examples/query.scm) for simple
 usage of application state.)
 
+See also [development.md](doc/development.md) to develop server
+script interactively with REPL.
+
 Gauche-makiki isn't an all-in-one framework; rather, we provide
 simple and orthogonal parts that can be combined together
 as needed.
