@@ -34,14 +34,17 @@
 (define-module makiki.dev
   (use gauche.threads)
   (use makiki)
+  (use util.match)
   (export start-server! stop-server!))
 (select-module makiki.dev)
 
 ;; Those APIs are supposed to be called interactively in REPL, so
-;; we don't care about thread safety for now.
+;; we don't worry much about thread safety.
 
 (define *server-file* #f)
 (define *server-thread* #f)
+(define *watched-file* #f)
+(define *watcher-thread* #f)
 
 ;; A module where the script is loaded.
 ;; We use named module, so that the user can switch into this module in REPL.
@@ -58,14 +61,25 @@
   (set! *server-file* path)
   ;; Kludge - clear the existing handlers.  This isn't a public API.
   ((with-module makiki clear-handlers!))
-  (load (sys-normalize-pathname path :absolute #t :expand #t)
-        :environment *server-module*)
+  (set! *server-file*
+        (%load (sys-normalize-pathname path :absolute #t :expand #t)
+               :environment *server-module*))
   (unless (and (thread? *server-thread*)
                (not (eq? (thread-state *server-thread*) 'terminated)))
     (dev-cch (make-server-control-channel))
     (set! *server-thread*
           (thread-start!
            (make-thread (cut %run-server! *server-module* path)))))
+  (unless (and (equal? *watched-file* *server-file*)
+               (thread? *watcher-thread*)
+               (not (eq? (thread-state *watcher-thread*) 'terminated)))
+    (when *watcher-thread*
+      (let1 t *watcher-thread*
+        (set! *watcher-thread* #f)
+        (thread-join! t)))
+    (set! *watched-file* *server-file*)
+    (set! *watcher-thread* ($ %make-file-watcher *watched-file*
+                              (^[] (start-server! *watched-file*)))))
   *server-thread*)
 
 ;; Called in a separate thread.  Run 'dev-main if it exists; otherwise,
@@ -84,6 +98,22 @@
                    server-file)
            #f])))
 
+;; Watch file updates by polling.
+;; TRANSIENNT: Once file.event module is available in Gauche, rewrite this.
+(define (%make-file-watcher server-file thunk)
+  (let1 mtime (sys-stat->mtime (sys-stat server-file))
+    ($ thread-start! $ make-thread
+       (rec (loop)
+         (sys-nanosleep #e5e8)
+         (let1 mtime2 (sys-stat->mtime (sys-stat server-file))
+           (unless (eqv? mtime mtime2)
+             (set! mtime mtime2)
+             (format (current-error-port) "~%Reloading ~s..." server-file)
+             (guard (e [else (report-error e)])
+               (thunk))
+             (fresh-line (current-error-port)))
+           (loop))))))
+
 ;; API
 (define (stop-server!)
   (when *server-thread*
@@ -99,3 +129,12 @@
   (cond [(global-variable-ref mod 'dev-shutdown #f)
          => (^[dev-shutdown] (dev-shutdown))]
         [else #f]))
+
+
+;; From Gauche 0.9.13, 'load' returns the actual file name that's loaded.
+;; To run Makiki with Gauche 0.9.12 or before, we emulate that load.
+(define (%load path :key environment)
+  (match ((with-module gauche.internal find-load-file)
+          path *load-path* *load-suffixes*
+          :error-if-not-found #t :allow-archive #f)
+    [(found _) (and (load found :environment environment) found)]))
