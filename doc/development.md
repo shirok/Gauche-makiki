@@ -20,7 +20,8 @@ Load the server script specified by `SCRIPT-PATH` and runs the
 server in a separate thread.
 
 It remembers `SCRIPT-PATH`, so you can omit it in the subsequent
-calls.
+calls.  It also watches updates of the script file, and whenever
+the file's mtime changes, it automatically reloads it.
 
 The script is loaded into a module `makiki.user`, to avoid interfering
 with whatever you're doing in the default `user` module.

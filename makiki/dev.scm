@@ -130,7 +130,7 @@
          => (^[dev-shutdown] (dev-shutdown))]
         [else #f]))
 
-
+;; TRANSIENT:
 ;; From Gauche 0.9.13, 'load' returns the actual file name that's loaded.
 ;; To run Makiki with Gauche 0.9.12 or before, we emulate that load.
 (define (%load path :key environment)
