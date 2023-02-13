@@ -35,7 +35,8 @@
   (use gauche.threads)
   (use makiki)
   (use util.match)
-  (export start-server! stop-server!))
+  (export start-server! stop-server!
+          add-watch! delete-watch!))
 (select-module makiki.dev)
 
 ;; Those APIs are supposed to be called interactively in REPL, so
@@ -44,6 +45,7 @@
 (define *server-file* #f)
 (define *server-thread* #f)
 (define *watched-file* #f)
+(define *extra-watched-files* '())
 (define *watcher-thread* #f)
 
 ;; A module where the script is loaded.
@@ -78,7 +80,7 @@
         (set! *watcher-thread* #f)
         (thread-join! t)))
     (set! *watched-file* *server-file*)
-    (set! *watcher-thread* ($ %make-file-watcher *watched-file*
+    (set! *watcher-thread* ($ %make-file-watcher
                               (^[] (start-server! *watched-file*)))))
   *server-thread*)
 
@@ -100,19 +102,30 @@
 
 ;; Watch file updates by polling.
 ;; TRANSIENNT: Once file.event module is available in Gauche, rewrite this.
-(define (%make-file-watcher server-file thunk)
-  (let1 mtime (sys-stat->mtime (sys-stat server-file))
+(define (%make-file-watcher thunk)
+  (define (get-mtimes)
+    (map (^f (sys-stat->mtime (sys-stat f)))
+         (cons *watched-file* *extra-watched-files*)))
+  (let1 mtimes (get-mtimes)
     ($ thread-start! $ make-thread
        (rec (loop)
          (sys-nanosleep #e5e8)
-         (let1 mtime2 (sys-stat->mtime (sys-stat server-file))
-           (unless (eqv? mtime mtime2)
-             (set! mtime mtime2)
-             (format (current-error-port) "~%Reloading ~s..." server-file)
+         (let1 mtimes2 (get-mtimes)
+           (unless (equal? mtimes mtimes2)
+             (set! mtimes mtimes2)
+             (format (current-error-port) "~%Reloading ~s..." *watched-file*)
              (guard (e [else (report-error e)])
                (thunk))
              (fresh-line (current-error-port)))
            (loop))))))
+
+;; API
+(define (add-watch! file)
+  (push-unique! *extra-watched-files* file equal?))
+
+;; API
+(define (delete-watch! file)
+  (update! *extra-watched-files* (cut delete file <> equal?)))
 
 ;; API
 (define (stop-server!)
