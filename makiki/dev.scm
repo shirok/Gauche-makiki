@@ -116,7 +116,7 @@
              (format (current-error-port) "~%Reloading ~s..." *watched-file*)
              (guard (e [else (report-error e)])
                (thunk))
-             (fresh-line (current-error-port)))
+             (newline (current-error-port)))
            (loop))))))
 
 ;; API
