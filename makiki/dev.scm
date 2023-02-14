@@ -60,28 +60,17 @@
 (define (start-server! :optional (path *server-file*))
   (unless path
     (error "Server file path rquired for the first call."))
-  (set! *server-file* path)
   ;; Kludge - clear the existing handlers.  This isn't a public API.
   ((with-module makiki clear-handlers!))
   (set! *server-file*
         (%load (sys-normalize-pathname path :absolute #t :expand #t)
                :environment *server-module*))
-  (unless (and (thread? *server-thread*)
-               (not (eq? (thread-state *server-thread*) 'terminated)))
+  (unless (%thread-alive? *server-thread*)
     (dev-cch (make-server-control-channel))
     (set! *server-thread*
           (thread-start!
            (make-thread (cut %run-server! *server-module* path)))))
-  (unless (and (equal? *watched-file* *server-file*)
-               (thread? *watcher-thread*)
-               (not (eq? (thread-state *watcher-thread*) 'terminated)))
-    (when *watcher-thread*
-      (let1 t *watcher-thread*
-        (set! *watcher-thread* #f)
-        (thread-join! t)))
-    (set! *watched-file* *server-file*)
-    (set! *watcher-thread* ($ %make-file-watcher
-                              (^[] (start-server! *watched-file*)))))
+  (%ensure-watcher!)
   *server-thread*)
 
 ;; Called in a separate thread.  Run 'dev-main if it exists; otherwise,
@@ -99,6 +88,21 @@
                    "Can't find 'dev-main' nor 'main' in the server script: ~s\n"
                    server-file)
            #f])))
+
+(define (%thread-alive? t)
+  (and (thread? t)
+       (not (eq? (thread-state *watcher-thread*) 'terminated))))
+
+(define (%ensure-watcher!)
+  (unless (and (equal? *watched-file* *server-file*)
+               (%thread-alive? *watcher-thread*))
+    (when *watcher-thread*
+      (let1 t *watcher-thread*
+        (set! *watcher-thread* #f)
+        (thread-join! t)))
+    (set! *watched-file* *server-file*)
+    (set! *watcher-thread* ($ %make-file-watcher
+                              (^[] (start-server! *watched-file*))))))
 
 ;; Watch file updates by polling.
 ;; TRANSIENNT: Once file.event module is available in Gauche, rewrite this.
