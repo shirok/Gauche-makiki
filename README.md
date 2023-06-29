@@ -144,11 +144,18 @@ The following convenience procedures are avaiable on the request record.
                             ;  'respond' procedures below takes care of
                             ;  writing response line and headers.
 
+    (request-params REQ)    ; List of query-string parameters, in the form
+                            ; of ((NAME VALUE ...) ...) where NAMEs and VALUEs
+                            ; are all strings.  It is compatible to the
+                            ; reutrn value of cgi-parse-parameters.
     (request-param-ref REQ PARAM-NAME . keys)
                             ; Retrieve request query-string parameter with
-                            ; PARAM-NAME.  KEYS are a keyward-value list
+                            ; PARAM-NAME.  KEYS are a keyword-value list
                             ; passed to cgi-get-parameter in www.cgi.
                             ; See also `let-params` below for easier access.
+    (request-headers REQ)   ; List of request headers, in the form of
+                            ; ((NAME VALUE) ...).  It is compatible to the
+                            ; header list used in rfc.822 module.
     (request-header-ref REQ HEADER-NAME :optional (DEFAULT #f))
                             ; retrieve the value from the request headers.
                             ; See also `let-params` below for easier access.
