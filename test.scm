@@ -63,6 +63,23 @@
      ))
 
 ;;;
+(test-section "component match")
+($ call-with-httpd "tests/path-components.scm"
+   (^[port]
+     (define s #"localhost:~port")
+     (define (g path expect)
+       (test* path expect (values-ref (http-get s path) 2)))
+     (define (p path expect)
+       (test* path expect (values-ref (http-post s path "") 2)))
+     (g "/foo/bar" "foo bar")
+     (g "/foo/baz" "foo var=baz")
+     (g "/foo/baz/bar" "foo var=baz bar")
+
+     (g "/boo/bar" "GET:boo x=bar")
+     (p "/boo/bar" "POST:boo x=bar")
+     ))
+
+;;;
 (test-section "file-handler")
 
 ($ call-with-httpd "tests/file.scm"

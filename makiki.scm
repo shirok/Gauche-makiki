@@ -528,13 +528,13 @@
 (define-syntax define-http-handler
   (syntax-rules (?)
     [(_ (m ...) pattern ? guard handler)
-     (add-http-handler! pattern handler guard '(m ...))]
+     (add-http-handler! 'pattern handler guard '(m ...))]
     [(_ (m ...) pattern handler)
-     (add-http-handler! pattern handler #f '(m ...))]
+     (add-http-handler! 'pattern handler #f '(m ...))]
     [(_ pattern ? guard handler)
-     (add-http-handler! pattern handler guard #f)]
+     (add-http-handler! 'pattern handler guard #f)]
     [(_ pattern handler)
-     (add-http-handler! pattern handler #f #f)]))
+     (add-http-handler! 'pattern handler #f #f)]))
 
 
 ;; Matcher :: (path, [commponents]) -> matchobj | #f
@@ -557,9 +557,9 @@
                 (and (pair? comps)
                      (cond [(string? pat)
                             (and (equal? pat (car comps))
-                                 (loop (cdr pats) (cdr comps) matched))]
+                                 (loop pats (cdr comps) matched))]
                            [(symbol? pat)
-                            (loop (cdr pats) (cdr comps)
+                            (loop pats (cdr comps)
                                   (acons pat (car comps) matched))]
                            [else
                             (error "Invalid element in pattern:" pat)]))]
@@ -569,7 +569,7 @@
          (error "Bad pattern:" pattern)]))
 
 (define (make-matched alist)
-  (^[key] (assq-ref key alist)))
+  (^[key] (assq-ref alist key)))
 
 ;; API
 (define (add-http-handler! pattern handler :optional (guard #f) (methods #f))
