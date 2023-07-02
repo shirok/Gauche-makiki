@@ -42,12 +42,8 @@
 ;; We pass the proc to extract path below '/src' to the :path-trans
 ;; arg of file-handler, which will interpret the translated path relative
 ;; to the document-root, which defaults to ".".
-(define-http-handler #/^\/src(\/.*)$/
-  (file-handler :path-trans (^[req] ((request-path-rxmatch req) 1))))
-
-;; Redirect "/src" to "/src/".
-(define-http-handler "/src"
-  (^[req app] (respond/redirect req "/src/")))
+(define-http-handler ("src" . path)
+  (file-handler :path-trans (^[req] #"/~((request-path-match req) 'path)")))
 
 ;; '/echo-header' reports back http request headers, handy for diagnostics.
 (define-http-handler "/echo-headers"

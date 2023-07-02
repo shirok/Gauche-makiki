@@ -88,10 +88,10 @@
          (html:p (html:a :href "/src/" "Browse makiki source"))
          (html:p (html:a :href "/logout" "Log out")))))))
 
-(define-http-handler #/^\/src(\/.*)$/
+(define-http-handler ("src" . paths)
   ? check-login
   ;; see sample-server for explanation of :path-trans
-  (file-handler :path-trans (^[req] ((request-path-rxmatch req) 1))))
+  (file-handler :path-trans (^[req] #"/~((request-path-match req) 1)")))
 
 (define-http-handler "/src"
   (^[req app] (respond/redirect req "/src/")))
