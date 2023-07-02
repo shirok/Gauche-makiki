@@ -553,7 +553,7 @@
            (and (string=? path pattern) (constantly #t)))]
         [(regexp? pattern)
          (^[path components] (pattern path))]
-        [(list? pattern)
+        [(or (null? pattern) (pair? pattern))
          (^[path components]
            (let loop ([pats pattern]
                       [comps components]
@@ -572,7 +572,9 @@
                            [else
                             (error "Invalid element in pattern:" pat)]))]
                [rest-pat
-                (make-matched (acons rest-pat comps matched))])))]
+                (make-matched (acons rest-pat
+                                     (string-join comps "/")
+                                     matched))])))]
         [else
          (error "Bad pattern:" pattern)]))
 
