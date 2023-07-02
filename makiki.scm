@@ -36,6 +36,7 @@
   (use control.thread-pool :prefix tpool:)
   (use data.queue)
   (use file.util)
+  (use gauche.collection)
   (use gauche.generator)
   (use gauche.logger)
   (use gauche.net)
@@ -295,10 +296,10 @@
       `[,var
         ,(if cv
            `(if-let1 ,tmp
-                (rxmatch-substring (request-path-rxmatch ,tmp-req) ,matchname)
+                ((request-path-rxmatch ,tmp-req) ,matchname)
               (,cv ,tmp)
               ,default)
-           `(or (rxmatch-substring (request-path-rxmatch ,tmp-req) ,matchname)
+           `(or ((request-path-rxmatch ,tmp-req) ,matchname)
                 ,default))]))
   (define (header-extractor var name default cv lis?)
     (let1 tmp (gensym)
@@ -535,25 +536,56 @@
     [(_ pattern handler)
      (add-http-handler! pattern handler #f #f)]))
 
+
+;; Matcher :: (path, [commponents]) -> matchobj | #f
+;; matchobj :: key -> matchval
+(define (build-matcher pattern)
+  (cond [(string? pattern)
+         (^[path components]
+           (and (string=? path pattern) (constantly #t)))]
+        [(regexp? pattern)
+         (^[path components] (pattern path))]
+        [(list? pattern)
+         (^[path components]
+           (let loop ([pats pattern]
+                      [comps components]
+                      [matched '()])
+             (match pats
+               [() (and (null? comps)
+                        (make-matched matched))]
+               [(pat . pats)
+                (and (pair? comps)
+                     (cond [(string? pat)
+                            (and (equal? pat (car comps))
+                                 (loop (cdr pats) (cdr comps) matched))]
+                           [(symbol? pat)
+                            (loop (cdr pats) (cdr comps)
+                                  (acons pat (car comps) matched))]
+                           [else
+                            (error "Invalid element in pattern:" pat)]))]
+               [rest-pat
+                (make-matched (acons rest-pat comps matched))])))]
+        [else
+         (error "Bad pattern:" pattern)]))
+
+(define (make-matched alist)
+  (^[key] (assq-ref key alist)))
+
 ;; API
 (define (add-http-handler! pattern handler :optional (guard #f) (methods #f))
   (let ([guard (or guard (^[m a] #t))]
         [methods (or methods '(GET HEAD POST))]
-        [rx (cond [(regexp? pattern) pattern]
-                  [(string? pattern)
-                   ($ string->regexp
-                      $ string-append "^" (regexp-quote pattern) "$")]
-                  [else (error "pattern must be a regexp or a string, but got"
-                               pattern)])])
-    (enqueue! *handlers* (list methods rx guard handler))))
+        [matcher (build-matcher pattern)])
+    (enqueue! *handlers* (list methods matcher guard handler))))
 
 ;; returns (handler req)
 (define (find-handler path req app)
-  (let1 method (request-method req)
+  (let ([method (request-method req)]
+        [path-components (string-split path #[/] 'prefix)])
     (any-in-queue (^[entry]
-                    (match-let1 (methods rx guard handler) entry
+                    (match-let1 (methods matcher guard handler) entry
                       (and-let* ([ (memq method methods) ]
-                                 [m (rx path)]
+                                 [m (matcher path path-components)]
                                  [g (begin (request-path-rxmatch-set! req m)
                                            (guard req app))])
                         (request-guard-value-set! req g)
