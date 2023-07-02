@@ -68,7 +68,8 @@
           request-remote-addr request-query
           request-line request-method request-uri request-http-version
           request-server-host request-server-port
-          request-path request-path-rxmatch request-guard-value
+          request-path request-path-match request-path-rxmatch
+          request-guard-value
           request-response-error
           request-params  request-param-ref
           request-headers request-header-ref
@@ -153,7 +154,7 @@
   server-host         ; request host (string)
   server-port         ; request port (integer)
   (path)              ; request path (string)
-  (path-rxmatch)      ; #<regmatch> object of matched path (set by dispatcher)
+  (path-match)        ; proc to extract matched path component (set by dispatcher)
   (guard-value)       ; the result of guard procedure (set by dispatcher)
   (query)             ; query string as passed in the request
   (params)            ; parsed query parameters
@@ -187,6 +188,13 @@
 (define-inline (make-ng-request msg socket)
   (%make-request msg socket (connection-peer-address socket) ""
                  "" "" "" 80 "" #f #f "" '() '() #f '() '() #f '() 0))
+
+;; Backward compatibility
+(define (request-path-rxmatch req)
+  (rlet1 r (request-path-match req)
+    (unless (or (not r) (is-a? r <regmatch>))
+      (error "Attempt to use request-path-rxmatch on a request not using \
+             regexp path match" req))))
 
 ;; API
 ;; The handler can throw this condition to respond to the client
@@ -296,10 +304,10 @@
       `[,var
         ,(if cv
            `(if-let1 ,tmp
-                ((request-path-rxmatch ,tmp-req) ,matchname)
+                ((request-path-match ,tmp-req) ,matchname)
               (,cv ,tmp)
               ,default)
-           `(or ((request-path-rxmatch ,tmp-req) ,matchname)
+           `(or ((request-path-match ,tmp-req) ,matchname)
                 ,default))]))
   (define (header-extractor var name default cv lis?)
     (let1 tmp (gensym)
@@ -586,7 +594,7 @@
                     (match-let1 (methods matcher guard handler) entry
                       (and-let* ([ (memq method methods) ]
                                  [m (matcher path path-components)]
-                                 [g (begin (request-path-rxmatch-set! req m)
+                                 [g (begin (request-path-match-set! req m)
                                            (guard req app))])
                         (request-guard-value-set! req g)
                         (list handler req))))

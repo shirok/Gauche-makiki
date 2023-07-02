@@ -10,12 +10,12 @@
   (^[req app] (respond/ok req "foo bar")))
 (define-http-handler ("foo" var)
   (^[req app]
-    (respond/ok req #"foo var=~((request-path-rxmatch req) 'var)")))
+    (respond/ok req #"foo var=~((request-path-match req) 'var)")))
 (define-http-handler ("foo" var "bar")
   (^[req app]
-    (respond/ok req #"foo var=~((request-path-rxmatch req) 'var) bar")))
+    (respond/ok req #"foo var=~((request-path-match req) 'var) bar")))
 
 (define-http-handler (POST) ("boo" x)
-  (^[req app] (respond/ok req #"POST:boo x=~((request-path-rxmatch req) 'x)")))
+  (^[req app] (respond/ok req #"POST:boo x=~((request-path-match req) 'x)")))
 (define-http-handler (GET) ("boo" x)
-  (^[req app] (respond/ok req #"GET:boo x=~((request-path-rxmatch req) 'x)")))
+  (^[req app] (respond/ok req #"GET:boo x=~((request-path-match req) 'x)")))

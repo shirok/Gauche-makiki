@@ -126,7 +126,7 @@ has the following slots (only public slots are shown):
       server-host         ; request host (string)
       server-port         ; request port (integer)
       path                ; request path (string, url decoded)
-      path-rxmatch        ; #<regmatch> object of matched path
+      path-match          ; proc to extract matched path component
       guard-value         ; the result of guard procedure
       query               ; unparsed query string
       params              ; query parameters (result of cgi-parse-parameters)
