@@ -82,7 +82,21 @@ accepts.  You can define different handler with the same `PATTERN`
 as far as `METHODS` don't overlap.   When omitted,
 `(GET HEAD POST)` is assumed.
 
-`PATTERN` can be a regexp or a string.
+`PATTERN` can be a string, a list, or a regexp.
+
+- If it is a string, it matches with the exactly same request path.  It
+  is suitable for resources with a fixed path.
+- If it is a list, each element must be either a string or a symbol.
+  The request path is splitted with `/` into a list of path components,
+  and each component is compared to the corresponding element of `PATTERN`.
+  If the pattern's element is a string, it must exactly match the path
+  component.  If the element is a symbol, it matches unconditionally to
+  the corresponding component, and the match is saved to `request-path-match`.
+  If the list is a dotted list, the last `cdr` must be a symbol, and it
+  matches any remaining components.
+- If it is a regexp, it is matched against the entire request path.
+  If matched, the match object is saved to `request-path-match` so that
+  submatches can be retrieved later.
 
 For each incoming request, the server matches its path of
 the request uri against `PATTERN`.  If `PATTERN` is a string,
