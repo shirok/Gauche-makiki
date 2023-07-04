@@ -83,6 +83,7 @@
           read-request-body
           let-params
           define-http-handler add-http-handler!
+          path:int path:hex
           document-root
           file-handler file-mime-type
           with-header-handler with-post-parameters with-post-json
@@ -616,12 +617,21 @@
       (receive rs (expr component)
         (match rs
           [(#f . _) #f]
-          [else (fold acons vars rs alist)])))))
+          [else (fold acons alist vars rs)])))))
 
 ;; Returns a lookup procedure suitable for request-path-match.
 (define (make-matched alist)
   (^[key] (assq-ref alist key)))
 
+;; API - utility to be used for path component matching
+(define (path:int comp)
+  (and-let* ([n (string->number comp)]
+             [ (exact-integer? n) ])
+    n))
+(define (path:hex comp)
+  (and-let* ([n (string->number comp 16)]
+             [ (exact-integer? n) ])
+    n))
 
 ;; API
 (define (add-http-handler! pattern handler :optional (guard #f) (methods #f))

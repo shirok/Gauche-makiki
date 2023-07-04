@@ -24,3 +24,12 @@
   (^[req app] (respond/ok req #"hoo x=~((request-path-match req) 'x) y=~((request-path-match req) 'y)")))
 (define-http-handler ("hoo" z)
   (^[req app] (respond/ok req #"hoo z=~((request-path-match req) 'z)")))
+
+(define-http-handler ("int" (path:int n))
+  (^[req app] (respond/ok req #"int n=~((request-path-match req) 'n)")))
+(define-http-handler ("int" x)
+  (^[req app] (respond/ok req #"int x=~((request-path-match req) 'x)")))
+(define-http-handler ("hex" (path:hex n))
+  (^[req app] (respond/ok req #"hex n=~((request-path-match req) 'n)")))
+(define-http-handler ("hex" x)
+  (^[req app] (respond/ok req #"hex x=~((request-path-match req) 'x)")))

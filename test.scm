@@ -81,6 +81,11 @@
      (g "/hoo/1234-5678" "hoo x=1234-5678 y=5678")
      (g "/hoo/123456789" "hoo z=123456789")
      (g "/hoo/var"       "hoo z=var")
+
+     (g "/int/483753" "int n=483753")
+     (g "/int/53cafe" "int x=53cafe")
+     (g "/hex/53cafe" "hex n=5491454")
+     (g "/hex/53cafeg" "hex x=53cafeg")
      ))
 
 ;;;
