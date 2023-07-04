@@ -42,6 +42,7 @@
   (use gauche.net)
   (use gauche.record)
   (use gauche.selector)
+  (use gauche.sequence)
   (use gauche.threads)
   (use gauche.uvector)
   (use gauche.vport)
@@ -536,14 +537,38 @@
 (define-syntax define-http-handler
   (syntax-rules (?)
     [(_ (m ...) pattern ? guard handler)
-     (add-http-handler! 'pattern handler guard '(m ...))]
+     (add-http-handler! (handle-pattern pattern) handler guard '(m ...))]
     [(_ (m ...) pattern handler)
-     (add-http-handler! 'pattern handler #f '(m ...))]
+     (add-http-handler! (handle-pattern pattern) handler #f '(m ...))]
     [(_ pattern ? guard handler)
-     (add-http-handler! 'pattern handler guard #f)]
+     (add-http-handler! (handle-pattern pattern) handler guard #f)]
     [(_ pattern handler)
-     (add-http-handler! 'pattern handler #f #f)]))
+     (add-http-handler! (handle-pattern pattern) handler #f #f)]))
 
+(define-syntax handle-pattern
+  (er-macro-transformer
+   (^[f r c]
+     (let1 pattern (cadr f)
+       (cond [(string? pattern) pattern]
+             [(regexp? pattern) pattern]
+             [(pair? pattern)
+              `(,(r'list*)
+                ,@(map* (^[pat]
+                          (match pat
+                            [(? string?) pat]
+                            [(? identifier?) `(,(r'quote) ,pat)]
+                            [(expr var ...) (=> fail)
+                             (unless (every identifier? var) (fail))
+                             `(,(r'list) ,expr
+                               ,@(map (^v `(,(r'quote) ,v)) var))]
+                            [else
+                             (error "Invalid pattern element:" pat)]))
+                        (^[tail]
+                          (unless (or (null? tail) (identifier? tail))
+                            (error "Invalid pattern:" pattern))
+                          `((,(r'quote) ,tail)))
+                        pattern))]
+             [else (error "Invalid pattern:" pattern)])))))
 
 ;; Matcher :: (path, [commponents]) -> matchobj | #f
 ;; matchobj :: key -> matchval
@@ -569,6 +594,9 @@
                            [(symbol? pat)
                             (loop pats (cdr comps)
                                   (acons pat (car comps) matched))]
+                           [(list? pat)
+                            (and-let1 m (component-match pat (car comps) matched)
+                              (loop pats (cdr comps) m))]
                            [else
                             (error "Invalid element in pattern:" pat)]))]
                [rest-pat
@@ -578,8 +606,22 @@
         [else
          (error "Bad pattern:" pattern)]))
 
+;; Handle (expr var ...) component in PATTERN.
+(define (component-match pattern component alist)
+  (match-let1 [expr . vars] pattern
+    (if (regexp? expr)
+      (and-let1 m (expr component)
+        (fold-with-index (^[index var alist] (acons var (m index) alist))
+                         alist vars))
+      (receive rs (expr component)
+        (match rs
+          [(#f . _) #f]
+          [else (fold acons vars rs alist)])))))
+
+;; Returns a lookup procedure suitable for request-path-match.
 (define (make-matched alist)
   (^[key] (assq-ref alist key)))
+
 
 ;; API
 (define (add-http-handler! pattern handler :optional (guard #f) (methods #f))

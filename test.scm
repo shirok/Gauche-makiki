@@ -77,6 +77,10 @@
 
      (g "/boo/bar" "GET:boo x=bar")
      (p "/boo/bar" "POST:boo x=bar")
+
+     (g "/hoo/1234-5678" "hoo x=1234-5678 y=5678")
+     (g "/hoo/123456789" "hoo z=123456789")
+     (g "/hoo/var"       "hoo z=var")
      ))
 
 ;;;
