@@ -94,6 +94,8 @@
 
 (autoload rfc.json construct-json-string parse-json-string <json-parse-error>)
 
+(autoload rfc.uuid parse-uuid)
+
 ;;;
 ;;; Some parameters
 ;;;
@@ -632,6 +634,14 @@
   (and-let* ([n (string->number comp 16)]
              [ (exact-integer? n) ])
     n))
+(cond-expand
+ [(library rfc.uuid)
+  ;; After 0.9.13, we can use (parse-uuid comp :if-invalid #f), but
+  ;; for now we have to trap uuid parse error.
+  (export path:uuid)
+  (define (path:uuid comp)
+    (guard (e [else #f]) (parse-uuid comp)))]
+ [else])
 
 ;; API
 (define (add-http-handler! pattern handler :optional (guard #f) (methods #f))

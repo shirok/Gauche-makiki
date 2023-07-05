@@ -86,6 +86,14 @@
      (g "/int/53cafe" "int x=53cafe")
      (g "/hex/53cafe" "hex n=5491454")
      (g "/hex/53cafeg" "hex x=53cafeg")
+
+     (cond-expand
+      [(library rfc.uuid)
+       (g "/uuid/cf33321e-18b4-46cf-b8a6-d6b09e743d00"
+          "uuid u=cf33321e-18b4-46cf-b8a6-d6b09e743d00")
+       (g "/uuid/cf33321e"
+          "uuid #f")]
+      [else])
      ))
 
 ;;;

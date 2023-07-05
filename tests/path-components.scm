@@ -33,3 +33,12 @@
   (^[req app] (respond/ok req #"hex n=~((request-path-match req) 'n)")))
 (define-http-handler ("hex" x)
   (^[req app] (respond/ok req #"hex x=~((request-path-match req) 'x)")))
+
+(cond-expand
+ [(library rfc.uuid)
+  (use rfc.uuid)
+  (define-http-handler ("uuid" (path:uuid u))
+    (^[req app] (respond/ok req #"uuid u=~(uuid->string ((request-path-match req) 'u))")))
+  (define-http-handler ("uuid" x)
+    (^[req app] (respond/ok req #"uuid #f")))]
+ [else])
