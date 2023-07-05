@@ -6,6 +6,7 @@
   * [Getting started](#getting-started)
   * [Handling requests](#handling-requests)
      * [Registering handlers](#registering-handlers)
+     * [Routing](#routing)
      * [Request record](#request-record)
      * [Accessing parameters passed by client](#accessing-parameters-passed-by-client)
      * [Handling POST/PUT request body](#handling-postput-request-body)
@@ -82,7 +83,33 @@ accepts.  You can define different handler with the same `PATTERN`
 as far as `METHODS` don't overlap.   When omitted,
 `(GET HEAD POST)` is assumed.
 
-`PATTERN` can be a string, a list, or a regexp.
+`PATTERN` is to specifys routing from the request path to the handler.
+It is explained in the Routing section below.
+
+`REQUEST` is a request record, explained below.
+`APP-DATA` is an application-specific data given at the time the server
+is started.  Gauche-makiki treats `APP-DATA` as opaque data; it's
+solely up to the application how to use it.
+
+The optional `GUARD-PROC` is a procedure called right after the
+server finds the request path matches `PATTERN`.
+It is called with two arguments,
+`REQUEST` and `APP-DATA`.  If the guard proc returns false,
+the server won't call the corresponding handler and look for
+another match instead.
+It is useful to refine the condition the handler is called.
+
+If the guard procedure returns a non-false value, it is stored in the
+`guard-value` slot of the request record, and available to the
+handler procedure.
+See [examples/session.scm](examples/session.scm) for an example
+of using a guard procedure and the request's `guard-value` slot.
+
+
+### Routing
+
+`PATTERN` argument of `define-http-handler` can be a string,
+a list, or a regexp,
 
 - If it is a string, it matches with the exactly same request path.  It
   is suitable for resources with a fixed path.
@@ -106,24 +133,27 @@ the server calls `HANDLER-PROC` with two arguments:
 
     (handler-proc REQUEST APP-DATA)
 
-`REQUEST` is a request record, explained below.
-`APP-DATA` is an application-specific data given at the time the server
-is started.  Gauche-makiki treats `APP-DATA` as opaque data; it's
-solely up to the application how to use it.
+Some routing examples:
 
-The optional `GUARD-PROC` is a procedure called right after the
-server finds the request path matches `PATTERN`.
-It is called with two arguments,
-`REQUEST` and `APP-DATA`.  If the guard proc returns false,
-the server won't call the corresponding handler and look for
-another match instead.
-It is useful to refine the condition the handler is called.
+    ;; Fixed path.  The handler is called when the client requests
+    ;; /favicon.ico.
+    (define-http-handler "/favicon.ico" handler)
 
-If the guard procedure returns a non-false value, it is stored in the
-`guard-value` slot of the request record, and available to the
-handler procedure.
-See [examples/session.scm](examples/session.scm) for an example
-of using a guard procedure and the request's `guard-value` slot.
+    ;; Path with parameter.  Paths such as "/usr/bob" or "/usr/alice"
+    ;; match, and the variable part can be retrieved with
+    ;; ((request-path-match req) 'user-id).
+    (define-http-handler ("user" user-id) handler)
+
+    ;; Path with parameter and conversion.  Obj-id part only matches
+    ;; a string valid as an integer, e.g. "/obj/233515".  The matched
+    ;; part is converted to an integer with the procedure path:int.
+    (define-http-handler ("obj" (path:int obj-id)) handler)
+
+    ;; If the pattern is a dotted-list, all the rest path components
+    ;; are saved with the name of the last cdr.  The following route
+    ;; matches "/src/a/b/c.txt", for example, and
+    ;; ((request-path-match req) 'path) gives "a/b/c.txt".
+    (define-http-handler ("src" . path) handler)
 
 
 ### Request record
