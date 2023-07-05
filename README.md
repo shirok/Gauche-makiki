@@ -155,6 +155,27 @@ Some routing examples:
     ;; ((request-path-match req) 'path) gives "a/b/c.txt".
     (define-http-handler ("src" . path) handler)
 
+There are a few utility procedures to help parsing a path component.
+They take a path component as a string, and returns #f if it is not
+accepted, or an object if accepted.
+
+    (path:int COMPONENT)
+
+If the path component string COMPONENT is a valid exact decimal integer
+representation, returns that exact integer; otherwise returns #f.
+
+    (path:hex COMPONENT)
+
+If the path component string COMPONENT is a valid exact hexadecimal
+integer representation, returns that exact integer; otherwise returns #f.
+
+    (path:uuid COMPONENT)
+
+If the path component string COMPONENT is a valid representation of
+UUOD, returns an UUID object; otherwise returns #f.  See
+[the document of rfc.uuid module](https://practical-scheme.net/gauche/man?p=rfc.uuid)
+for the details of UUID representation.
+
 
 ### Request record
 
