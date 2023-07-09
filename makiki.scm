@@ -69,7 +69,7 @@
           request-remote-addr request-query
           request-line request-method request-uri request-http-version
           request-server-host request-server-port
-          request-path request-path-match request-path-rxmatch
+          request-path request-path-match request-path-ref request-path-rxmatch
           request-guard-value
           request-response-error
           request-params  request-param-ref
@@ -199,6 +199,12 @@
     (unless (or (not r) (is-a? r <regmatch>))
       (error "Attempt to use request-path-rxmatch on a request not using \
              regexp path match" req))))
+
+;; API
+(define (request-path-ref req key :optional (default #f))
+  (if-let1 m (request-path-match req)
+    (m key)
+    default))
 
 ;; API
 ;; The handler can throw this condition to respond to the client
