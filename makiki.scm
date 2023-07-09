@@ -83,7 +83,7 @@
           read-request-body
           let-params
           define-http-handler add-http-handler!
-          path:int path:hex
+          path:int path:hex path:symbol
           document-root
           file-handler file-mime-type
           with-header-handler with-post-parameters with-post-json
@@ -634,6 +634,10 @@
   (and-let* ([n (string->number comp 16)]
              [ (exact-integer? n) ])
     n))
+(define ((path:symbol rx) comp)
+  (and-let1 m (rx comp)
+    (string->symbol (m))))
+
 (cond-expand
  [(library rfc.uuid)
   ;; After 0.9.13, we can use (parse-uuid comp :if-invalid #f), but

@@ -87,6 +87,10 @@
      (g "/hex/53cafe" "hex n=5491454")
      (g "/hex/53cafeg" "hex x=53cafeg")
 
+     (g "/sym/abcde" "sym y=abcde")
+     (g "/sym/foo_123" "sym y=foo_123")
+     (g "/sym/foo-123" "sym #f")
+
      (cond-expand
       [(library rfc.uuid)
        (g "/uuid/cf33321e-18b4-46cf-b8a6-d6b09e743d00"
