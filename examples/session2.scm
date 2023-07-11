@@ -75,7 +75,7 @@
 (define-http-handler ("src" . path)
   ? check-login
   ;; see sample-server for explanation of :path-trans
-  (file-handler :path-trans (^[req] #"/~((request-path-match req) 'path)")))
+  (file-handler :path-trans (^[req] #"/~(request-path-ref req 'path)")))
 
 (define-http-handler "/src"
   (^[req app] (respond/redirect req "/src/")))

@@ -43,7 +43,7 @@
 ;; arg of file-handler, which will interpret the translated path relative
 ;; to the document-root, which defaults to ".".
 (define-http-handler ("src" . path)
-  (file-handler :path-trans (^[req] #"/~((request-path-match req) 'path)")))
+  (file-handler :path-trans (^[req] #"/~(request-path-ref req 'path)")))
 
 ;; '/echo-header' reports back http request headers, handy for diagnostics.
 (define-http-handler "/echo-headers"
