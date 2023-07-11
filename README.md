@@ -176,6 +176,10 @@ UUOD, returns an UUID object; otherwise returns #f.  See
 [the document of rfc.uuid module](https://practical-scheme.net/gauche/man?p=rfc.uuid)
 for the details of UUID representation.
 
+The value of the matched componenent can be retrieved with passing
+the key value to `(request-path-match req)`, or, more conveniently,
+using `request-path-ref`.  See below.
+
 
 ### Request record
 
@@ -233,6 +237,11 @@ The following convenience procedures are avaiable on the request record.
                             ; `rfc.cookie`, i.e.
                             ; `(<name> <value> <cookie-parameters> ...)`
                             ; See also `let-params` below for easier access.
+    (request-path-ref REQ KEY :optional (DEFAULT #f))
+                            ; returns the value matched to the path component
+                            ; designated with KEY.  If the input path did not
+                            ; match they component with KEY, DEFAULT is
+                            ; retunred instead.
 
 The handler procedure can set/modify response headers using
 the following procedures.
