@@ -1,6 +1,5 @@
 #!/usr/bin/env gosh
-;; Authentication and session management example for Gauche 0.9.4
-;; It is simpler with Gauche 0.9.5 and later.  See session2.scm.
+;; Authentication and session management example
 ;; Run this script in the top directory of Gauche-makiki
 
 (add-load-path ".." :relative)
@@ -8,15 +7,23 @@
 (use gauche.threads)
 (use text.html-lite)
 (use util.match)
+(use data.cache)
 (use srfi-27)
 (use makiki)
+
+;; application
+(define-class <app> ()
+  (;; session table is just a TTLR cache, keyed by session token in the cookie.
+   ;; session data :
+   ;;  (#f . <path>)     - a non-logged-in client is trying to access <path>
+   ;;  (#t . <username>) - logged in.
+   [sessions :init-form (make-ttlr-cache (* 10 60))]))
 
 (define (main args)
   (let-args (cdr args) ([port "p|port=i" 8012])
     (random-source-randomize! default-random-source)
     (start-http-server :access-log #t :error-log #t :port port
-                       ;; We pass session hashtable as app-data
-                       :app-data (atom (make-hash-table 'equal?))))
+                       :app-data (atom (make <app>))))
   0)
 
 (define *password-db*
@@ -25,56 +32,33 @@
     ("debussy" . "claude")
     ("faure" . "gabriel")))
 
-;; Simple session management
-;; Here we just use a hashtable that maps session id to (timestamp . data)
-;; It is in-memory, so server restarts would invalidate it.
-;; In real app, you can use some persistence (e.g. dbm) and/or external
-;; database (dbi, memchache, etc.)
-;; NB: This should be simpler.
-
-;; Session times out in 10 minutes
-(define (%sweep-session table)
-  (define cutoff (- (sys-time) (* 10 60)))
-  (hash-table-for-each table
-                       (^[key entry]
-                         (when (< (car entry) cutoff)
-                           (hash-table-delete! table key)))))
-
+;; Returns session-data (#f . path) or (#t . user), if it exists.
 (define (session-data req app)
-  (let-params req ([key "c:sess"])
-    (and key
-         ($ atomic app
-            (^[table]
-              (%sweep-session table)
-              (and-let* ([p (hash-table-get table key #f)])
-                (cdr p)))))))
-
-(define (session-create! req app data)
-  ($ atomic app
-     (^[table]
-       (%sweep-session table)
-       (let* ([now (sys-time)]
-              [key (format "~8,'0x~16,'0x" now (random-integer (expt 2 64)))])
-         (hash-table-put! table key (cons now data))
-         (response-cookie-add! req "sess" key :path "/")))))
-
-(define (session-delete! req app)
-  (let-params req ([key "c:sess"])
-    (and key (atomic app (^[table] (hash-table-delete! table key))))))
-
-;; session-data :
-;;  (#f . <path>)     - a non-logged-in client is trying to access <path>
-;;  (#t . <username>) - logged in.
-
-;;
-;; Routing
-;;
+  (let-params req ([cookie "c:sess"])
+    (and cookie
+         (atomic app (^a (cache-lookup! (~ a'sessions) cookie #f))))))
 
 ;; Returns username if the client has active session, #f otherwise.
 (define (check-login req app)
   (and-let* ([data (session-data req app)]
              [ (car data) ])
     (cdr data)))
+
+;; Delete session
+(define (session-delete! req app)
+  (let-params req ([cookie "c:sess"])
+    (and cookie
+         (atomic app (^a (cache-evict! (~ a'sessions) cookie))))))
+
+;; Create a new session
+(define (session-create! req app data)
+  (let1 key (format "~8,'0x~16,'0x" (sys-time) (random-integer (expt 2 64)))
+    ($ atomic app (^a (cache-write! (~ a'sessions) key data)))
+    (response-cookie-add! req "sess" key :path "/")))
+
+;;
+;; Routing
+;;
 
 ;; '/' and '/src/' are accessible after login.
 (define-http-handler "/"

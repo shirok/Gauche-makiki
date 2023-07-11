@@ -6,8 +6,8 @@ query - handling GET query-string parameters.
 
 post - handling POST request
 
-upload -handling file upload
+upload - handling file upload
 
-session, session2 - session management
+session - session management
 
 proxy - rudimenal proxy server, showing usage of connect handler.
