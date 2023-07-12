@@ -822,6 +822,7 @@ See [simple proxy example](examples/proxy.scm).
 
 * `makiki.cgi` : Handling CGI scripts.
 
+* `makiki.dev` : Interactive REPL development while running a server.
 
 ## Examples
 
