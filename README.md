@@ -522,8 +522,10 @@ a plain text (text/plain).
 
 By default, we only return "Internal Server Error" to the client,
 which is a bit inconvenient during development.  If the environment
-variable MAKIKI_DEBUG is set when the server is run, we add
-the error message in the error response as well.  Make sure you don't
+variable `MAKIKI_DEBUGGING` is set when the server is run, we add
+the error message in the error response as well.  You can also turn on
+the debugging feature by setting the parameter `debugging` to a true
+value.   Make sure you don't
 set the environment variable in the production environment, so that you
 wouln't reveal any internal information accidentally.
 
