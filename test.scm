@@ -74,6 +74,7 @@
      (g "/foo/bar" "foo bar")
      (g "/foo/baz" "foo var=baz")
      (g "/foo/baz/bar" "foo var=baz bar")
+     (g "/foo/bar/" "foo bar")
 
      (g "/boo/bar" "GET:boo x=bar")
      (p "/boo/bar" "POST:boo x=bar")

@@ -663,7 +663,8 @@
 ;; returns (handler req)
 (define (find-handler path req app)
   (let ([method (request-method req)]
-        [path-components (string-split path #[/] 'prefix)])
+        [path-components (string-split (string-trim-right path #[/])
+                                       #[/] 'prefix)])
     (any-in-queue (^[entry]
                     (match-let1 (methods matcher guard handler) entry
                       (and-let* ([ (memq method methods) ]
