@@ -126,10 +126,12 @@ a list, or a regexp,
   submatches can be retrieved later.
 
 For each incoming request, the server matches its path of
-the request uri against `PATTERN`.  If `PATTERN` is a string,
-entire request path must match exactly to the pattern.  If `PATTERN`
-is a regexp, `rxmatch` is used.  When the request path matches,
-the server calls `HANDLER-PROC` with two arguments:
+the request uri against `PATTERN`.  Note: For component-wise match
+with a list pattern, trailing slashes of request path is ignored; that is,
+`("foo" x)` maches `"/foo/bar"` and `"/foo/bar/"`.
+
+When the request path matches, the server calls `HANDLER-PROC` with
+two arguments:
 
     (handler-proc REQUEST APP-DATA)
 
