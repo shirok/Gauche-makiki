@@ -306,5 +306,8 @@
 (use makiki.dev)
 (test-module 'makiki.dev)
 
+(use makiki.session)
+(test-module 'makiki.session)
+
 ;; epilogue
 (test-end :exit-on-failure #t)
