@@ -32,9 +32,8 @@
 
 ;; Usage:
 ;;   1. Inherit <session-mixin> class by your app class.  Then a session-bin
-;;      is automatically available with default settings.
-;;   2. Create a session bin and add it to the
-
+;;      is automatically available.
+;;   2. Create a session bin and keep it somewhere.
 
 (define-module makiki.session
   (use gauche.threads)
@@ -48,16 +47,30 @@
   (;; all slots are private
    (%cache :init-keyword :cache)))
 
+(define-constant *default-timeout* (* 60 60 2))
+
 (define %key-gen (strings-of 64 #[\w]))
 
 ;; API
-(define (make-session-bin :optional (timeout (* 60 60 2)))
+(define (make-session-bin :optional (timeout *default-timeout*))
   (make <session-bin>
     :cache (make-ttlr-cache timeout :comparator string-comparator)))
 
 ;; API
 (define-class <session-mixin> ()
-  ((session-bin :init-form (atom (make-session-bin)))))
+  (;; This mixin class recognizes :session-timeout init option, which is
+   ;; used to initialize session-bin.
+   (session-bin)))
+
+(define-method initialize ((obj <session-bin>) initargs)
+  (next-method)
+  ;; We wrap the session-bin with atom, for we don't know how application
+  ;; handles the locking.  It is redundant if the application locks entire
+  ;; app object, but that should be minor.
+  (set! (~ obj'session-bin)
+        (atom
+         (make-ttlr-cache (get-keyword :session-timeout initargs
+                                       *default-timeout*)))))
 
 ;; API
 (define-method session-ref ((app <session-mixin>) key :optional default)
@@ -69,6 +82,8 @@
     default))
 
 ;; API
+;;   KEY can be #f, in which case a new session key is generated.
+;;   Returns the session key.
 (define-method session-set! ((app <session-mixin>) key data)
   (atomic (~ app'session-bin)
           (cut session-set! <> key data)))
