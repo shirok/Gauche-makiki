@@ -792,19 +792,20 @@
          (let* ([method (string->symbol (string-upcase meth))]
                 [headers (rfc822-read-headers (connection-input-port csock))]
                 [req (make-request line csock method req-uri httpvers headers)])
-           (if-let1 dispatcher (find-method-dispatcher method)
-             (guard (e [(<request-error> e)
-                        (respond/ng req (~ e'status) :body (~ e'body)
-                                    :content-type (~ e'content-type))]
-                       [else
-                        (error-log "http handler error ~s\n~a" (~ e'message)
-                                   (report-error e #f))
-                        (receive (status content-type body)
-                            (server-error-handler req app e)
-                          (respond/ng req status :body body
-                                      :content-type content-type))])
-               (dispatch-worker dispatcher req app))
-             (respond/ng (make-ng-request #"[E] ~line" csock) 501)))]
+           (parameterize ([%respond-callbacks '()])
+             (if-let1 dispatcher (find-method-dispatcher method)
+               (guard (e [(<request-error> e)
+                          (respond/ng req (~ e'status) :body (~ e'body)
+                                      :content-type (~ e'content-type))]
+                         [else
+                          (error-log "http handler error ~s\n~a" (~ e'message)
+                                     (report-error e #f))
+                          (receive (status content-type body)
+                              (server-error-handler req app e)
+                            (respond/ng req status :body body
+                                        :content-type content-type))])
+                 (dispatch-worker dispatcher req app))
+               (respond/ng (make-ng-request #"[E] ~line" csock) 501))))]
         [else (respond/ng (make-ng-request #"[E] ~line" csock) 400)]))))
 
 (define (server-error-handler req app e) ;returns status, content-type and body
