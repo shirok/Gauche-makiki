@@ -531,6 +531,32 @@ value.   Make sure you don't
 set the environment variable in the production environment, so that you
 wouln't reveal any internal information accidentally.
 
+
+### Tweaking responde headers and cookies
+
+Response headers and cookies are sent back to a client inside one of
+response procedures such as `respond/ok`.  When you're writing a
+wrapper handler, there can be a case that you want to add response
+headers or cookies after the internal handler generates content, but
+before it is sent back to the client.  For example, you might send
+a cookie depending on the parameter value which may be modified by
+the internal handler.
+
+You can register callbacks for that purpose.
+
+   (respond-callback-add! (^[req code content-type] ...))
+
+The callback list is empty when the handler is called.  If callbacks are
+added during handling, they are called in the order of addition, with
+three arguments: The request record, integer response code, and string
+content-type.  At the time the callback is called, the content of the
+response is already generated, but no information is sent back to the
+client yet.  You can modify response headers and cookies there.  You
+can't change the response content, though.
+
+The callback must return `#f`.  We may allow other return values in future.
+
+
 ## Built-in handlers
 
 For typical tasks, we provide convenience procedures to build a

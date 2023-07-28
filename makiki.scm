@@ -390,6 +390,7 @@
 ;;   Respond callback is invoked before response is sent to the client.
 ;;   You can add cookies and/or headers here.  You can't modify response code
 ;;   or response body.
+;;   proc := (<^> <req> code::<integer> content-type::<string>)
 (define (respond-callback-add! proc)
   (push! (%respond-callbacks) proc))
 
