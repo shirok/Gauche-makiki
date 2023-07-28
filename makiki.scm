@@ -77,6 +77,7 @@
           request-cookies request-cookie-ref
           <request-error> request-error
           respond/ng respond/ok respond/redirect
+          respond-callback-add!
           response-header-push! response-header-delete!
           response-header-replace!
           response-cookie-add! response-cookie-delete!
@@ -357,6 +358,8 @@
            [(u8vector? content) (u8vector-length content)]
            [(pair? content) (car content)]
            [else (error "invalid response content:" content)]))
+  (dolist [cb (reverse (%respond-callbacks))]
+    (cb req code content-type))
   (let ([port (request-oport req)]
         [desc (or (http-status-code->description code) "")])
     (define (p x) (if (u8vector? x) (write-block x port) (display x port)))
@@ -382,6 +385,15 @@
         (cond [(or (string? content) (u8vector? content)) (p content)]
               [(pair? content) (dolist [chunk (cdr content)] (p chunk))]))
       (flush port))))
+
+;; API
+;;   Respond callback is invoked before response is sent to the client.
+;;   You can add cookies and/or headers here.  You can't modify response code
+;;   or response body.
+(define (respond-callback-add! proc)
+  (push! (%respond-callbacks) proc))
+
+(define %respond-callbacks (make-parameter '()))
 
 ;; Handle 'body' argument for respond/ok and respond/ng.  Returns
 ;; content-type and <content>.  If content-type arg is #f, we assume
