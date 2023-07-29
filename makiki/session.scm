@@ -30,22 +30,20 @@
 
 ;; Support common session handling
 
-;; Usage:
-;;   1. Inherit <session-mixin> class by your app class.  Then a session-bin
-;;      is automatically available.
-;;   2. Create a session bin and keep it somewhere.
-
 (define-module makiki.session
   (use gauche.threads)
   (use data.cache)
   (use data.random)
-  (export make-session-bin <session-mixin>
-          session-ref session-set! session-delete!))
+  (use makiki)
+  (export make-session-bin session-key
+          session-ref session-set! session-delete!
+          with-session))
 (select-module makiki.session)
 
 (define-class <session-bin> ()
   (;; all slots are private
-   (%cache :init-keyword :cache)))
+   (%timeout :init-keyword :timeout :immutable #t)
+   (%bin :init-keyword :bin)))
 
 (define-constant *default-timeout* (* 60 60 2))
 
@@ -54,47 +52,63 @@
 ;; API
 (define (make-session-bin :optional (timeout *default-timeout*))
   (make <session-bin>
-    :cache (make-ttlr-cache timeout :comparator string-comparator)))
+    :timeout timeout
+    :bin (atom (make-ttlr-cache timeout :comparator string-comparator))))
+
+;; Global session bin for the default.  An application can override
+;; it with `with-session`.
+(define %the-session-bin
+  (make-parameter (make-session-bin)))
+
+;; `with-session` binds this parameter to the session key.  #f means
+;; no session.
+(define session-key (make-parameter #f))
 
 ;; API
-(define-class <session-mixin> ()
-  (;; This mixin class recognizes :session-timeout init option, which is
-   ;; used to initialize session-bin.
-   (session-bin)))
-
-(define-method initialize ((obj <session-bin>) initargs)
-  (next-method)
-  ;; We wrap the session-bin with atom, for we don't know how application
-  ;; handles the locking.  It is redundant if the application locks entire
-  ;; app object, but that should be minor.
-  (set! (~ obj'session-bin)
-        (atom
-         (make-ttlr-cache (get-keyword :session-timeout initargs
-                                       *default-timeout*)))))
-
-;; API
-(define-method session-ref ((app <session-mixin>) key :optional default)
-  (atomic (~ app'session-bin)
-          (cut session-ref <> key default)))
-(define-method session-ref ((bin <session-bin>) key :optional (default #f))
-  (if key
-    (cache-lookup! (~ bin'%cache) key default)
+(define (session-ref :optional (default #f))
+  (if-let1 key (session-key)
+    (atomic (~ (%the-session-bin)'%bin) (cut cache-lookup! <> key default))
     default))
 
 ;; API
-;;   KEY can be #f, in which case a new session key is generated.
-;;   Returns the session key.
-(define-method session-set! ((app <session-mixin>) key data)
-  (atomic (~ app'session-bin)
-          (cut session-set! <> key data)))
-(define-method session-set! ((bin <session-bin>) key data)
-  (rlet1 key (or key (%key-gen))
-    (cache-write! (~ bin'%cache) key data)))
+;;   If there's no active key, a new key is created.
+(define (session-set! data)
+  (rlet1 key (or (session-key)
+                 (rlet1 k (%key-gen)
+                   (session-key k)))
+    (atomic (~ (%the-session-bin)'%bin) (cut cache-write! <> key data))))
 
 ;; API
-(define-method session-delete! ((app <session-mixin>) key)
-  (atomic (~ app'session-bin)
-          (cut session-delete! <> key)))
-(define-method session-delete! ((bin <session-mixin>) key)
-  (cache-evict! (~ bin'%cache) key)
+(define (session-delete!)
+  (and-let1 key (session-key)
+    (atomic (~ (%the-session-bin)'%bin) (cut cache-evict! <> key)))
+  (session-key #f)
   (undefined))
+
+;; API
+(define (with-session handler
+                      :optional (bin-getter %the-session-bin)
+                                (cookie-name "makiki-session")
+                                (cookie-secure #f))
+  (^[req app]
+    (let ([bin (bin-getter)]
+          [key (request-cookie-ref req cookie-name)])
+      ;; We need to determine response cookie after the body of the
+      ;; handler is executed, so we use respond-callback.
+      (respond-callback-add!
+       (^[req code content-type]
+         (cond
+          [(session-key)
+           ;; If session-key is set, we set it to the cookie.  This covers
+           ;; both existing sessions and new sessions.
+           => (^[key]
+                ($ response-cookie-add! req cookie-name key
+                   :max-age (~ bin'%timeout)
+                   :secure cookie-secure))]
+          [key
+           ;; If request had the key but not in session-key, the handler
+           ;; deleted the session.
+           (response-cookie-delete! req cookie-name)])))
+      ;; Run handler with session-key bound to the request key
+      (parameterize ((session-key key))
+        (handler req app)))))
