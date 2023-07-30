@@ -51,6 +51,7 @@
   (use rfc.http)
   (use rfc.mime)
   (use rfc.uri)
+  (use rfc.tls)
   (use srfi.13)
   (use srfi.19)
   (use sxml.tools)
@@ -158,6 +159,7 @@
   http-version        ; http version (string, e.g. "1.1")
   server-host         ; request host (string)
   server-port         ; request port (integer)
+  secure              ; #f: plain, #t: ssl, forwarded: https rev proxy
   (path)              ; request path (string)
   (path-match)        ; proc to extract matched path component (set by dispatcher)
   (guard-value)       ; the result of guard procedure (set by dispatcher)
@@ -183,8 +185,13 @@
     (if-let1 m (#/:(\d+)$/ host:port)
       (values (m'before) (x->integer (m 1)))
       (values host:port 80)))
+  (define secure-channel?               ; a kind of heuristics
+    (cond [(is-a? csock <tls>) #t]
+          [(equal? (rfc822-header-ref headers "x-forwarded-proto") "https")
+           'forwarded]
+          [else #f]))
   (%make-request request-line csock (connection-peer-address csock)
-                 method request-uri http-vers host port
+                 method request-uri http-vers host port secure-channel?
                  (uri-decode-string path :cgi-decode #t) #f #f
                  query (cgi-parse-parameters :query-string (or query ""))
                  headers #f (delay (%request-parse-cookies headers))
