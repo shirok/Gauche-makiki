@@ -196,6 +196,12 @@ has the following slots (only public slots are shown):
       http-version        ; requested version (e.g. "1.1")
       server-host         ; request host (string)
       server-port         ; request port (integer)
+      secure              ; whether the communication is secure
+                          ;  This can be
+                          ;    - #t (we have direct TLS connection),
+                          ;    - 'forwarded (we have reverse proxy that has
+                          ;       secure connection to the client),
+                          ;    - #f (otherwise)
       path                ; request path (string, url decoded)
       path-match          ; proc to extract matched path component
       guard-value         ; the result of guard procedure
@@ -256,6 +262,10 @@ the following procedures.
 
 (NB: `response-cookie-delete!` merely removes the named cookie form
 the response message; it does not remove the cookie from the client.)
+
+By default, `secure` attribute of the cookie is automatically added
+if `request-secure` has a true value.  You can turn off this behavior
+by setting the parameter `add-secure-cookie` to false.
 
 
 ### Accessing parameters passed by client
