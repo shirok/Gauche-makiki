@@ -88,8 +88,7 @@
 ;; API
 (define (with-session handler
                       :optional (bin-getter %the-session-bin)
-                                (cookie-name "makiki-session")
-                                (cookie-secure #f))
+                                (cookie-name "makiki-session"))
   (^[req app]
     (let ([bin (bin-getter)]
           [key (request-cookie-ref req cookie-name)])
@@ -103,8 +102,7 @@
            ;; both existing sessions and new sessions.
            => (^[key]
                 ($ response-cookie-add! req cookie-name key
-                   :max-age (~ bin'%timeout)
-                   :secure cookie-secure))]
+                   :max-age (~ bin'%timeout)))]
           [key
            ;; If request had the key but not in session-key, the handler
            ;; deleted the session.
