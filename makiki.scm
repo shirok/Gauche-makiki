@@ -62,7 +62,7 @@
   (export start-http-server http-server-software
           access-log access-log-drain
           error-log error-log-drain
-          debugging
+          debugging auto-secure-cookie
           add-method-dispatcher!
           make-server-control-channel
           terminate-server-loop
@@ -107,6 +107,7 @@
 (define file-mime-type (make-parameter (^[path] #f)))
 (define profiler-output (make-parameter (sys-getenv "MAKIKI_PROFILER_OUTPUT")))
 (define debugging (make-parameter (sys-getenv "MAKIKI_DEBUGGING")))
+(define auto-secure-cookie (make-parameter #t))
 
 ;; This is for development.  An implicit side-channel to stop the server.
 ;; Not for general use.
@@ -382,8 +383,7 @@
       (p "Content-Type: ") (p content-type) (crlf)
       (p "Content-Length: ") (p (request-response-size req)) (crlf)
       (cond [(request-send-cookies req) pair?
-             => (^[cs] ($ map (cut response-header-push! req "set-cookie" <>)
-                          $ construct-cookie-string cs))])
+             => (cut %prepare-response-cookies req <>)])
       (dolist [h (request-response-headers req)]
         (dolist [v (cdr h)]
           (p (car h)) (p ": ") (p v) (crlf)))
@@ -392,6 +392,15 @@
         (cond [(or (string? content) (u8vector? content)) (p content)]
               [(pair? content) (dolist [chunk (cdr content)] (p chunk))]))
       (flush port))))
+
+(define (%prepare-response-cookies req cookies)
+  (dolist [cookie cookies]
+    (match-let1 (name value . opts) cookies
+      (let1 opts (if (and (~ req'secure) (auto-secure-cookie))
+                   `(:secure #t ,(delete-keyword :secure opts))
+                   opts)
+        ($ response-header-push! req "set-cookie"
+           $ construct-cookie-string `(,name ,value ,@opts))))))
 
 ;; API
 ;;   Respond callback is invoked before response is sent to the client.
