@@ -275,7 +275,7 @@
            (cut remove (^e (equal? (car e) name)) <>)))
 
 ;; API
-;; (let-request-params req ((var spec ...) ...) body ...)
+;; (let-params req ((var spec ...) ...) body ...)
 ;; spec : [source] kv-list ...
 ;; source is a string with the format "kind" or "kind:name".
 ;; kind part is one-character indicating where the value is taken:
