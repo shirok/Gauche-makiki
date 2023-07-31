@@ -397,7 +397,7 @@
   (dolist [cookie cookies]
     (match-let1 (name value . opts) cookie
       (let1 opts (if (and (~ req'secure) (auto-secure-cookie))
-                   `(:secure #t ,(delete-keyword :secure opts))
+                   `(:secure #t ,@(delete-keyword :secure opts))
                    opts)
         (dolist [cs (construct-cookie-string `((,name ,value ,@opts)))]
           (response-header-push! req "set-cookie" cs))))))

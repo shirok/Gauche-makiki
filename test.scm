@@ -212,9 +212,9 @@
 ($ call-with-httpd "tests/cookie.scm"
    (^[port]
      (define s #"localhost:~port")
-     (define (t query expects)
+     (define (t query expects . opts)
        (test* "set-cookie" expects
-              (receive [c hdrs body] (http-get s #"/?~query")
+              (receive [c hdrs body] (apply http-get s #"/?~query" opts)
                 (pprint hdrs)
                 (filter-map (^[hdr]
                               (and (equal? (car hdr) "set-cookie")
@@ -222,6 +222,9 @@
                             hdrs))))
      (t "cookie-test=foo" '("cookie-test=foo;Max-Age=60"))
      (t "a=b&c=d" '("a=b;Max-Age=60" "c=d;Max-Age=60"))
+
+     (t "foo=bar" '("foo=bar;Secure;Max-Age=60")
+        :x-forwarded-proto "https")
      ))
 
 ;;;
