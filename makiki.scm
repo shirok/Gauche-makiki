@@ -395,12 +395,12 @@
 
 (define (%prepare-response-cookies req cookies)
   (dolist [cookie cookies]
-    (match-let1 (name value . opts) cookies
+    (match-let1 (name value . opts) cookie
       (let1 opts (if (and (~ req'secure) (auto-secure-cookie))
                    `(:secure #t ,(delete-keyword :secure opts))
                    opts)
-        ($ response-header-push! req "set-cookie"
-           $ construct-cookie-string `(,name ,value ,@opts))))))
+        (dolist [cs (construct-cookie-string `((,name ,value ,@opts)))]
+          (response-header-push! req "set-cookie" cs))))))
 
 ;; API
 ;;   Respond callback is invoked before response is sent to the client.
