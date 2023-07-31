@@ -13,6 +13,6 @@
 (define-http-handler "/"
   (with-post-json
    (^[req app]
-     (if-let1 json #?=(request-param-ref req "json-body")
+     (if-let1 json (request-param-ref req "json-body")
        (respond/ok req `(json (("count" . ,(+ 1 (assoc-ref json "count" 0))))))
        (respond/ok req '(json (("count" . 0))))))))
