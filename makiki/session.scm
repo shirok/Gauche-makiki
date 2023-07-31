@@ -47,7 +47,7 @@
 
 (define-constant *default-timeout* (* 60 60 2))
 
-(define %key-gen (strings-of 64 #[\w]))
+(define %key-gen (strings-of 64 (chars$ #[\w])))
 
 ;; API
 (define (make-session-bin :optional (timeout *default-timeout*))
@@ -91,7 +91,8 @@
                                 (cookie-name "makiki-session"))
   (^[req app]
     (let ([bin (bin-getter)]
-          [key (request-cookie-ref req cookie-name)])
+          ;; NB: cookie := (name value opts ...)
+          [cookie (request-cookie-ref req cookie-name)])
       ;; We need to determine response cookie after the body of the
       ;; handler is executed, so we use respond-callback.
       (respond-callback-add!
@@ -103,10 +104,10 @@
            => (^[key]
                 ($ response-cookie-add! req cookie-name key
                    :max-age (~ bin'%timeout)))]
-          [key
+          [cookie
            ;; If request had the key but not in session-key, the handler
            ;; deleted the session.
            (response-cookie-delete! req cookie-name)])))
       ;; Run handler with session-key bound to the request key
-      (parameterize ((session-key key))
+      (parameterize ((session-key (and cookie (cadr cookie))))
         (handler req app)))))

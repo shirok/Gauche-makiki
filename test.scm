@@ -330,5 +330,28 @@
 (use makiki.session)
 (test-module 'makiki.session)
 
+;;;
+(test-section "sessions")
+
+($ call-with-httpd "tests/session.scm"
+   (^[port]
+     (define s #"localhost:~port")
+     (define session-key #f)
+     (define (get-session-key hdrs)
+       (and-let* ([v (rfc822-header-ref hdrs "set-cookie")]
+                  [m (#/^makiki-session=(.*)/ v)])
+         (m 1)))
+     (test* "query before login" "none"
+            (values-ref (http-get s "/query") 2))
+     (test* "login" "OK"
+            (receive (code hdrs body) (http-get s "/login")
+              (set! session-key (get-session-key hdrs))
+              (and (string? session-key) body)))
+     (test* "query after login" "bar"
+            (values-ref (http-get s "/query"
+                                  :cookie #"makiki-session=~|session-key|")
+                        2))
+     ))
+
 ;; epilogue
 (test-end :exit-on-failure #t)
