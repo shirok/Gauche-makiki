@@ -171,7 +171,7 @@
                       ;  set by respond/* procedures.
   ;; private slots
   (cookies %request-cookies request-cookies-set!) ; promise of alist of parsed cookies
-  (send-cookies)      ; alist of cookie spec (set by handler)
+  send-cookies        ; hashtable {cookie-name::<string> -> (name value . opts)}
   (status)            ; result status (set by responder)
   (response-headers)  ; response headers (set by handler)
   (response-size))    ; size of reply content in octets (set by responder)
@@ -196,7 +196,8 @@
                  (uri-decode-string path :cgi-decode #t) #f #f
                  query (cgi-parse-parameters :query-string (or query ""))
                  headers #f (delay (%request-parse-cookies headers))
-                 '() #f '() 0))
+                 (make-hash-table 'string=?)
+                 #f '() 0))
 
 (define-inline (make-ng-request msg socket)
   (%make-request msg socket (connection-peer-address socket) ""
@@ -268,11 +269,11 @@
 (define (request-cookie-ref req name :optional (default #f))
   (or (assoc name (request-cookies req)) default))
 (define (response-cookie-add! req name value . options)
-  (response-cookie-delete! req name)
-  (push! (request-send-cookies req) `(,name ,value ,@options)))
+  (hash-table-put! (request-send-cookies req) name
+                   `(,name ,value ,@options)))
 (define (response-cookie-delete! req name)
-  (update! (request-send-cookies req)
-           (cut remove (^e (equal? (car e) name)) <>)))
+  (hash-table-put! (request-send-cookies req) name
+                   `(,name "" :expires 0)))
 
 ;; API
 ;; (let-params req ((var spec ...) ...) body ...)
@@ -382,8 +383,8 @@
       (p "Server: ") (p (http-server-software)) (crlf)
       (p "Content-Type: ") (p content-type) (crlf)
       (p "Content-Length: ") (p (request-response-size req)) (crlf)
-      (cond [(request-send-cookies req) pair?
-             => (cut %prepare-response-cookies req <>)])
+      ($ %prepare-response-cookies req
+         $ hash-table-values (request-send-cookies req))
       (dolist [h (request-response-headers req)]
         (dolist [v (cdr h)]
           (p (car h)) (p ": ") (p v) (crlf)))

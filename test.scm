@@ -219,7 +219,8 @@
                 (filter-map (^[hdr]
                               (and (equal? (car hdr) "set-cookie")
                                    (cadr hdr)))
-                            hdrs))))
+                            hdrs))
+              (cut lset= equal? <> <>)))
      (t "cookie-test=foo" '("cookie-test=foo;Max-Age=60"))
      (t "a=b&c=d" '("a=b;Max-Age=60" "c=d;Max-Age=60"))
 

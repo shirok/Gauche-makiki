@@ -260,8 +260,14 @@ the following procedures.
     (response-cookie-add! REQ NAME VALUE . COOKIE-OPTIONS)
     (response-cookie-delete! REQ NAME)
 
-(NB: `response-cookie-delete!` merely removes the named cookie form
-the response message; it does not remove the cookie from the client.)
+If a header with the same name is pushed more than once, they all
+appear in the response.  If you want to override the previously
+pushed header, use `response-header-replace!`.
+
+If a cookie with the same name is added, it replaces the previous
+one if any.  Note that `response-cookie-delete!` does send back
+a cookie to the client, but with the past expiration time so that
+the client will delete it on its end.
 
 By default, `secure` attribute of the cookie is automatically added
 if `request-secure` has a true value.  You can turn off this behavior
