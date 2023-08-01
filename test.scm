@@ -352,6 +352,13 @@
             (values-ref (http-get s "/query"
                                   :cookie #"makiki-session=~|session-key|")
                         2))
+     (test* "logout" ";Expires=Thu, 01-Jan-1970 00:00:00 GMT"
+            (receive (code hdrs body)
+                (http-get s "/logout"
+                          :cookie #"makiki-session=~|session-key|")
+              (get-session-key hdrs)))
+     (test* "query after logout" "none"
+            (values-ref (http-get s "/query") 2))
      ))
 
 ;; epilogue
