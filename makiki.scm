@@ -397,10 +397,17 @@
 (define (%prepare-response-cookies req cookies)
   (dolist [cookie cookies]
     (match-let1 (name value . opts) cookie
-      (let1 opts (if (and (~ req'secure) (auto-secure-cookie))
-                   `(:secure #t ,@(delete-keyword :secure opts))
-                   opts)
-        (dolist [cs (construct-cookie-string `((,name ,value ,@opts)))]
+      (let* ([opts (if (and (~ req'secure) (auto-secure-cookie))
+                     `(:secure #t ,@(delete-keyword :secure opts))
+                     opts)]
+             ;; TRANSIENT: Workaround of rfc.cookie 'Expires' header
+             ;; is regarded as obsoleted in the old RFC (it was in the
+             ;; original Netscape spec).  However, RFC6265
+             ;; reintroduced it.  Until Gauche is updated, we need the
+             ;; explicit version for construct-cookie-string to make
+             ;; it recognize Expires attribute.
+             [vers (if (get-keyword :expires opts #f) 0 1)])
+        (dolist [cs (construct-cookie-string `((,name ,value ,@opts)) vers)]
           (response-header-push! req "set-cookie" cs))))))
 
 ;; API
