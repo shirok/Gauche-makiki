@@ -352,6 +352,10 @@
             (values-ref (http-get s "/query"
                                   :cookie #"makiki-session=~|session-key|")
                         2))
+     (test* "guard with session" "Yo"
+            (values-ref (http-get s "/anything"
+                                  :cookie #"makiki-session=~|session-key|")
+                        2))
      (test* "logout" ";Expires=Thu, 01-Jan-1970 00:00:00 GMT"
             (receive (code hdrs body)
                 (http-get s "/logout"
@@ -359,6 +363,8 @@
               (get-session-key hdrs)))
      (test* "query after logout" "none"
             (values-ref (http-get s "/query") 2))
+     (test* "guard with session (logout)" "Huh?"
+            (values-ref (http-get s "/anything") 2))
      ))
 
 ;; epilogue

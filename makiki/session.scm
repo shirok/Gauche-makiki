@@ -35,15 +35,17 @@
   (use data.cache)
   (use data.random)
   (use makiki)
-  (export make-session-bin session-key
+  (export make-session-bin session-key session-cookie-name
           session-ref session-set! session-delete!
-          with-session))
+          with-session guard-with-session))
 (select-module makiki.session)
 
 (define-class <session-bin> ()
   (;; all slots are private
    (%timeout :init-keyword :timeout :immutable #t)
    (%bin :init-keyword :bin)))
+
+(define session-cookie-name (make-parameter "makiki-session"))
 
 (define-constant *default-timeout* (* 60 60 2))
 
@@ -86,13 +88,12 @@
   (undefined))
 
 ;; API
-(define (with-session handler
-                      :optional (bin-getter %the-session-bin)
-                                (cookie-name "makiki-session"))
+(define (with-session handler)
   (^[req app]
-    (let ([bin (bin-getter)]
-          ;; NB: cookie := (name value opts ...)
-          [cookie (request-cookie-ref req cookie-name)])
+    (let* ([bin (%the-session-bin)]
+           [cookie-name (session-cookie-name)]
+           ;; NB: cookie := (name value opts ...)
+           [cookie (request-cookie-ref req cookie-name)])
       ;; We need to determine response cookie after the body of the
       ;; handler is executed, so we use respond-callback.
       (respond-callback-add!
@@ -111,3 +112,9 @@
       ;; Run handler with session-key bound to the request key
       (parameterize ((session-key (and cookie (cadr cookie))))
         (handler req app)))))
+
+(define (guard-with-session a-guard)
+  (^[req app]
+    (let1 cookie (request-cookie-ref req (session-cookie-name))
+      (parameterize ((session-key (and cookie (cadr cookie))))
+        (a-guard req app)))))

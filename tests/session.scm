@@ -23,3 +23,11 @@
    (^[req app]
      (session-delete!)
      (respond/ok req "OK"))))
+
+(define-http-handler #/.*/
+  ? (guard-with-session (^[req app] (session-ref)))
+  (with-session
+   (^[req app] (respond/ok req "Yo"))))
+
+(define-http-handler #/.*/
+  (^[req app] (respond/ok req "Huh?")))
