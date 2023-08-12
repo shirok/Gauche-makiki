@@ -1,0 +1,82 @@
+@c EN
+\input texinfo    @c -*- mode: texinfo; coding: utf-8; -*-
+@c COMMON
+@comment %**start of header
+@documentencoding UTF-8
+
+@c EN
+@documentlanguage en
+@setfilename gauche-makiki-e.info
+@settitle Makiki - Simple HTTP server in Gauche
+@dircategory The Algorithmic Language Scheme
+@direntry
+* Gauche Makiki: (gauche-makiki-e.info).	Simple HTTP Server in Gauche
+@end direntry
+@c COMMON
+@comment %**end of header
+
+@titlepage
+@c EN
+@title Makiki - Simple HTTP server in Gauche
+@c COMMON
+@subtitle version @VERSION@
+@author Shiro Kawai (shiro@@acm.org)
+
+@page
+@vskip 0pt plus 1filll
+Copyright @copyright{} 2023  Shiro Kawai  <shiro@@acm.org>
+
+@end titlepage
+@title Gauche-makiki : HTTP Server in Gauche
+@subtitle version @VERSION@
+@author Shiro Kawai (shiro@@acm.org)
+
+@page
+@vskip 0pt plus 1filll
+Copyright @copyright{} 2010-2023  Shiro Kawai  <shiro@@acm.org>
+
+@end titlepage
+
+@node Top
+
+@ifnottex
+This is a reference manual of Gauche-makiki,
+an HTTP server written in Gauche Scheme implementation.
+This manual is for version @VERSION@.
+@end ifnottex
+
+@node Introduction
+@chapter Introduction
+
+Gauche-makiki is a simple multithreaded http server intended for
+applications that want to provide http server capability, or
+write an application server in Gauche.
+
+The basic functionalities are available by just one file,
+@code{makiki.scm}, so you can just copy that file into
+your source tree, if you want a simple embedded http server in
+your application.
+
+This package also has several submodules, and you want to take
+the standard installation procedure if you want to write an
+application server.
+
+Gauche-makiki is not particularly written for speed or bandwidth.
+You can put Makiki server behind a reverse proxy, and let it serve
+only dynamic parts of the web application, while let the front-end
+webserver (e.g. Apache) serve the static content.
+
+
+
+
+
+
+
+
+
+@contents
+@bye
+
+@c Local variables:
+@c outline-regexp: "@chap\\|@unnu\\|@\\(sub\\)*section"
+@c end:
