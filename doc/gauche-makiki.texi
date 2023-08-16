@@ -37,7 +37,7 @@ Copyright @copyright{} 2010-2023  Shiro Kawai  <shiro@@acm.org>
 
 @end titlepage
 
-@node Top
+@node Top, Introduction, (dir), (dir)
 
 @ifnottex
 This is a reference manual of Gauche-makiki,
@@ -45,11 +45,17 @@ an HTTP server written in Gauche Scheme implementation.
 This manual is for version @VERSION@.
 @end ifnottex
 
-@node Introduction
+@menu
+* Introduction::
+* Getting started::
+* API reference::
+@end menu
+
+@node Introduction, Getting started, Top, Top
 @chapter Introduction
 
 Gauche-makiki is a simple multithreaded http server intended for
-applications that want to provide http server capability, or
+embedded http server capability, or
 write an application server in Gauche.
 
 The basic functionalities are available by just one file,
@@ -57,7 +63,7 @@ The basic functionalities are available by just one file,
 your source tree, if you want a simple embedded http server in
 your application.
 
-This package also has several submodules, and you want to take
+This package also has several auxiliary modules, and you want to take
 the standard installation procedure if you want to write an
 application server.
 
@@ -66,13 +72,75 @@ You can put Makiki server behind a reverse proxy, and let it serve
 only dynamic parts of the web application, while let the front-end
 webserver (e.g. Apache) serve the static content.
 
+@menu
+* Installation::
+@end menu
+
+@node Installation,  , Introduction, Introduction
+@section Installation
+
+@subheading Prerequisites
+
+You need Gauche 0.9.12 or later:
+@url{https://practical-scheme.net/Gauche}.
+
+Make sure Gauche is compled with thread support.  Once you
+install Gauche, you can check its configuration with @code{gosh -V}.
+
+@example
+$ gosh -V
+Gauche scheme shell, version 0.9.12 [utf-8,pthreads], x86_64-pc-linux-gnu
+(version "0.9.12")
+(command "gosh")
+(scheme.id gauche)
+(languages scheme r5rs r7rs)
+(encodings utf-8)
+(website "https://practical-scheme.net/gauche")
+(build.platform "x86_64-pc-linux-gnu")
+(build.configure "--prefix=/usr" "--enable-multibyte=utf-8")
+(scheme.path "/usr/share/gauche-0.98/site/lib" "/usr/share/gauche-0.98/0.9.12/lib")
+(gauche.threads pthreads)
+(gauche.net.tls mbedtls)
+@end example
 
 
+You should have either @code{(gauche.threads pthreads)} or
+@code{(gauche.threads wthreads)}.
+
+@subheading Installation
+
+You can install Gauche-makiki from git source tree:
+
+@example
+git clone https://github.com/shirok/Gauche-makiki.git
+cd Gauche-makiki
+./configure
+make check
+make install
+@end example
+
+The @code{configure} script (it is @emph{not} generated from @code{autoconf})
+checks if you have Gauche installed in @code{PATH}, and tries to
+set up installation destination in the same location.  If you want
+to install Gauche-makiki in a different location, give it with
+@code{--prefix} option.
+
+@example
+./configure --prefix=/path/to/install/location
+@end example
+
+@node Getting started, API reference, Introduction, Top
+@chapter Getting started
 
 
+@node API reference,  , Getting started, Top
+@chapter API reference
 
 
+@node Index
+@appendixchap Index
 
+@printindex fn
 
 @contents
 @bye

@@ -1,0 +1,42 @@
+SHELL       = @SHELL@
+srcdir      = @srcdir@
+VPATH       = $(srcdir)
+top_builddir = @top_builddir@
+top_srcdir   = @top_srcdir@
+
+MANPAGES =
+EXTRACTED = gauche-makiki-refe.texi gauche-makiki-refj.texi
+GENERATED = Makefile
+
+GOSH          = "@GOSH@"
+GAUCHE_CONFIG = "@GAUCHE_CONFIG@"
+INSTALL       = "@GAUCHE_INSTALL@"
+MAKEINFO      = "@MAKEINFO@"
+GZIP_PROGRAM  = "@GZIP_PROGRAM@"
+
+infodir = "$(DESTDIR)`$(GAUCHE_CONFIG) --infodir`"
+
+all: info
+
+texi : gauche-makiki-refe.texi gauche-makiki-refj.texi
+
+html : gauche-makiki-refe.html gauche-makiki-refj.html
+
+info : gauche-makiki-refe.info.gz gauche-makiki-refj.info.gz
+
+gauche-makiki-refe.texi : gauche-makiki-ref.texi
+	$(GOSH) tools/preprocess-info -en -o gauche-makiki-refe.texi gauche-makiki-ref.texi
+
+gauche-makiki-refj.texi : gauche-makiki-ref.texi
+	$(GOSH) tools/preprocess-info -jp -o gauche-makiki-refj.texi gauche-makiki-ref.texi
+
+clean:
+	rm -rf core *~ *.aux *.cl *.cls *.cp *.fn *.fns *.ky *.log *.md *.mds \
+	       *.pg *.toc *.tp *.tps *.vr *.vrs *.pdf *.dvi *.info* \
+	       *.html $(EXTRACTED)
+
+distclean : clean
+	rm -rf $(GENERATED)
+
+maintainer-clean : clean
+	rm -ff $(GENERATED) $(EXTRACTED)
