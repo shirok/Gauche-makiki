@@ -4,3 +4,9 @@
 /config.log
 /test.log
 /test-server.log
+
+/doc/Makefile
+/doc/gauche-makiki.en.texi
+/doc/gauche-makiki.ja.texi
+/doc/gauche-makiki.en.info.gz
+/doc/gauche-makiki.ja.info.gz
