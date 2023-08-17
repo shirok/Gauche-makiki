@@ -5,6 +5,10 @@
 (use gauche.configure)
 
 (cf-init-gauche-extension)
+
+(cf-check-prog 'MAKEINFO '("makeinfo"))
+(cf-check-prog 'GZIP_PROGRAM '("gzip"))
+
 (cf-output-default)
 
 ;; Local variables:

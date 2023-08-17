@@ -5,7 +5,7 @@ top_builddir = @top_builddir@
 top_srcdir   = @top_srcdir@
 
 MANPAGES =
-EXTRACTED = gauche-makiki-refe.texi gauche-makiki-refj.texi
+EXTRACTED = gauche-makiki.en.texi gauche-makiki.ja.texi
 GENERATED = Makefile
 
 GOSH          = "@GOSH@"
@@ -18,20 +18,34 @@ infodir = "$(DESTDIR)`$(GAUCHE_CONFIG) --infodir`"
 
 all: info
 
-texi : gauche-makiki-refe.texi gauche-makiki-refj.texi
+texi : gauche-makiki.en.texi gauche-makiki.ja.texi
 
-html : gauche-makiki-refe.html gauche-makiki-refj.html
+html : gauche-makiki.en.html gauche-makiki.en.html
 
-info : gauche-makiki-refe.info.gz gauche-makiki-refj.info.gz
+info : gauche-makiki.en.info.gz gauche-makiki.ja.info.gz
 
-gauche-makiki-refe.texi : gauche-makiki-ref.texi
-	$(GOSH) tools/preprocess-info -en -o gauche-makiki-refe.texi gauche-makiki-ref.texi
+gauche-makiki.en.info.gz : gauche-makiki.en.texi
+	if test -n "$(MAKEINFO)" -a -n "$(GZIP_PROGRAM)"; then \
+	  $(MAKEINFO) --no-warn gauche-makiki.en.texi; \
+	  rm -rf gauche-makiki.en.info*.gz; \
+	  $(GZIP_PROGRAM) gauche-makiki.en.info ; \
+	fi
 
-gauche-makiki-refj.texi : gauche-makiki-ref.texi
-	$(GOSH) tools/preprocess-info -jp -o gauche-makiki-refj.texi gauche-makiki-ref.texi
+gauche-makiki.ja.info.gz : gauche-makiki.ja.texi
+	if test -n "$(MAKEINFO)" -a -n "$(GZIP_PROGRAM)"; then \
+	  $(MAKEINFO) --no-warn gauche-makiki.ja.texi; \
+	  rm -rf gauche-makiki.ja.info*.gz; \
+	  $(GZIP_PROGRAM) gauche-makiki.ja.info ; \
+	fi
+
+gauche-makiki.en.texi : gauche-makiki.texi
+	$(GOSH) tools/preprocess-info -en -o gauche-makiki.en.texi gauche-makiki.texi
+
+gauche-makiki.ja.texi : gauche-makiki.texi
+	$(GOSH) tools/preprocess-info -jp -o gauche-makiki.ja.texi gauche-makiki.texi
 
 clean:
-	rm -rf core *~ *.aux *.cl *.cls *.cp *.fn *.fns *.ky *.log *.md *.mds \
+	rm -rf core *~ *.aux *.cp *.fn *.fns *.ky *.log \
 	       *.pg *.toc *.tp *.tps *.vr *.vrs *.pdf *.dvi *.info* \
 	       *.html $(EXTRACTED)
 

@@ -1,39 +1,34 @@
-@c EN
 \input texinfo    @c -*- mode: texinfo; coding: utf-8; -*-
-@c COMMON
 @comment %**start of header
 @documentencoding UTF-8
 
 @c EN
 @documentlanguage en
-@setfilename gauche-makiki-e.info
+@setfilename gauche-makiki.en.info
 @settitle Makiki - Simple HTTP server in Gauche
 @dircategory The Algorithmic Language Scheme
 @direntry
-* Gauche Makiki: (gauche-makiki-e.info).	Simple HTTP Server in Gauche
+* Gauche Makiki: (gauche-makiki.en.info).	Simple HTTP Server in Gauche
+@end direntry
+@c JP
+@documentlanguage ja
+@setfilename gauche-makiki.ja.info
+@settitle Makiki - Gaucheによる簡単なHTTPサーバ
+@dircategory The Algorithmic Language Scheme
+@direntry
+* Gauche Makiki: (gauche-makiki.ja.info).	Gaucheによる簡単なHTTPサーバ
 @end direntry
 @c COMMON
 @comment %**end of header
 
 @titlepage
-@c EN
 @title Makiki - Simple HTTP server in Gauche
-@c COMMON
 @subtitle version @VERSION@
 @author Shiro Kawai (shiro@@acm.org)
 
 @page
 @vskip 0pt plus 1filll
 Copyright @copyright{} 2023  Shiro Kawai  <shiro@@acm.org>
-
-@end titlepage
-@title Gauche-makiki : HTTP Server in Gauche
-@subtitle version @VERSION@
-@author Shiro Kawai (shiro@@acm.org)
-
-@page
-@vskip 0pt plus 1filll
-Copyright @copyright{} 2010-2023  Shiro Kawai  <shiro@@acm.org>
 
 @end titlepage
 
@@ -49,6 +44,7 @@ This manual is for version @VERSION@.
 * Introduction::
 * Getting started::
 * API reference::
+* Index::
 @end menu
 
 @node Introduction, Getting started, Top, Top
@@ -133,12 +129,12 @@ to install Gauche-makiki in a different location, give it with
 @chapter Getting started
 
 
-@node API reference,  , Getting started, Top
+@node API reference, Index, Getting started, Top
 @chapter API reference
 
 
-@node Index
-@appendixchap Index
+@node Index,  , API reference, Top
+@chapter Index
 
 @printindex fn
 
