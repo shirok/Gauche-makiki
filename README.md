@@ -29,7 +29,7 @@
 
 ## Overview
 
-Gauche-makiki is a simple multithreaded http server intended for
+Gauche-makiki is a simple multi-threaded http server intended for
 applications that want to provide http server capability easily.
 The main functionalities are available by just one file, `makiki.scm`,
 so you can either install it as an ordinary Gauche extension library,
@@ -83,7 +83,7 @@ accepts.  You can define different handler with the same `PATTERN`
 as far as `METHODS` don't overlap.   When omitted,
 `(GET HEAD POST)` is assumed.
 
-`PATTERN` is to specifys routing from the request path to the handler.
+`PATTERN` is to specify routing from the request path to the handler.
 It is explained in the Routing section below.
 
 `REQUEST` is a request record, explained below.
@@ -114,7 +114,7 @@ a list, or a regexp,
 - If it is a string, it matches with the exactly same request path.  It
   is suitable for resources with a fixed path.
 - If it is a list, each element must be either a string or a symbol.
-  The request path is splitted with `/` into a list of path components,
+  The request path is split with `/` into a list of path components,
   and each component is compared to the corresponding element of `PATTERN`.
   If the pattern's element is a string, it must exactly match the path
   component.  If the element is a symbol, it matches unconditionally to
@@ -128,7 +128,7 @@ a list, or a regexp,
 For each incoming request, the server matches its path of
 the request uri against `PATTERN`.  Note: For component-wise match
 with a list pattern, trailing slashes of request path is ignored; that is,
-`("foo" x)` maches `"/foo/bar"` and `"/foo/bar/"`.
+`("foo" x)` matches `"/foo/bar"` and `"/foo/bar/"`.
 
 When the request path matches, the server calls `HANDLER-PROC` with
 two arguments:
@@ -178,7 +178,7 @@ UUOD, returns an UUID object; otherwise returns #f.  See
 [the document of rfc.uuid module](https://practical-scheme.net/gauche/man?p=rfc.uuid)
 for the details of UUID representation.
 
-The value of the matched componenent can be retrieved with passing
+The value of the matched component can be retrieved with passing
 the key value to `(request-path-match req)`, or, more conveniently,
 using `request-path-ref`.  See below.
 
@@ -212,7 +212,7 @@ has the following slots (only public slots are shown):
                           ;  set by respond/* procedures.  The handler can check
                           ;  this slot and take actions in case of an error.
 
-The following convenience procedures are avaiable on the request record.
+The following convenience procedures are available on the request record.
 
     (request-iport REQ)     ; input port to read from the client
     (request-oport REQ)     ; output port to write to the client.
@@ -249,7 +249,7 @@ The following convenience procedures are avaiable on the request record.
                             ; returns the value matched to the path component
                             ; designated with KEY.  If the input path did not
                             ; match they component with KEY, DEFAULT is
-                            ; retunred instead.
+                            ; returned instead.
 
 The handler procedure can set/modify response headers using
 the following procedures.
@@ -281,8 +281,8 @@ query parameters in the url is parsed and saved in `request-params`.
 (Note: Parameters passed via `POST` request body are not
 parsed automatically; see *Handling POST request body* below.)
 
-It is ofen the case that the server needs to look at several
-different places to see what parameters the client prodives;
+It is often the case that the server needs to look at several
+different places to see what parameters the client provides;
 most commonly they are passed via query parameters in url
 or form-encoded in POST body, but can also be via request path
 component (often the case in REST API) or sometimes via cookies
@@ -432,7 +432,7 @@ this procedure returns `#<eof>`.
 #### Roll your own reader
 
 If you need to handle request body specially (for example, if the client
-sends huge binary data, you don't want to read everyhing into memory),
+sends huge binary data, you don't want to read everything into memory),
 you can handle it by yourself.  When the handler is called, the request
 body is available to be read from `(request-iport req)`.  Check
 the content-type header first, for it must specify the size of the request
@@ -462,7 +462,7 @@ various types of replies.
                             ; Send back a redirection message using Location
                             ; header.  URI can be an absolute uri or
                             ; just a path component; in the latter case,
-                            ; protocol, host and port compoents are
+                            ; protocol, host and port components are
                             ; automatically added.
 
 These procedures return after the entire message is sent.  If an error
@@ -497,11 +497,11 @@ by `construct-json-string` (see `rfc.json`), then sent back as
 * (`sxml` _sxml_) : The SXML tree is rendered by to XML or HTML. (If
 the root node of _sxml_ is `html`, then `sxml:sxml->html` is used to
 render to HTML with content type `text/html; charset=utf-8`.  Otherwise
-`sxml:sxml->xml` is used to render to XML, with conten type
+`sxml:sxml->xml` is used to render to XML, with content type
 `application/xml`.
 
 * (`chunks` _string-or-u8vector_ ...) : Chunks are concatenated
-and sent back as `application/octed-stream`.  This form allows
+and sent back as `application/octet-stream`.  This form allows
 you to pass a lazy list, so that you can avoid creating entire
 content in memory.
 
@@ -510,7 +510,7 @@ Check out scripts in `examples` directory for some concrete examples.
 
 ### Errors and response
 
-You can raise a condition `<request-error>` to nofity the client that
+You can raise a condition `<request-error>` to notify the client that
 you encounter an error during processing the request.  Use the
 `request-error` procedure to raise the condition:
 
@@ -545,10 +545,10 @@ the error message in the error response as well.  You can also turn on
 the debugging feature by setting the parameter `debugging` to a true
 value.   Make sure you don't
 set the environment variable in the production environment, so that you
-wouln't reveal any internal information accidentally.
+wouldn't reveal any internal information accidentally.
 
 
-### Tweaking responde headers and cookies
+### Tweaking response headers and cookies
 
 Response headers and cookies are sent back to a client inside one of
 response procedures such as `respond/ok`.  When you're writing a
@@ -678,11 +678,11 @@ used to calculate `PATH_INFO` CGI metavariable.
 
 If you're running Makiki server behind a reverse proxy, give a true
 value to FORWARDED.  Then Makiki adjust SERVER_NAME, SERVER_PORT, and
-HTTPS cgi metavariables according to the external conneciton (between
+HTTPS cgi metavariables according to the external connection (between
 the client and the proxy server), instead of the internal connection
 (between the proxy and Makiki).  It is important to produce output
-usnig what the client directly sees; e.g. a link to the same site
-must use the external hostname and port, otherwise the clinent
+using what the client directly sees; e.g. a link to the same site
+must use the external hostname and port, otherwise the client
 can't follow the link.
 
 
@@ -871,4 +871,4 @@ See [simple proxy example](examples/proxy.scm).
 ## Examples
 
 The [examples](examples/) directory contains some simple server scripts,
-each one shows how to implement a specific fuctionality.
+each one shows how to implement a specific functionality.

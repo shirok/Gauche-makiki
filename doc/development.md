@@ -10,7 +10,7 @@ in a separate thread so that you can keep working in REPL, and also
 it supports reloading of the script so that you can incrementally
 improve the program without stopping the server.
 
-## Walkthrough
+## Walk-through
 
 ## API
 
@@ -49,7 +49,7 @@ to reinitialize application and restart the server loop.
 ### `(stop-server!)`
 
 Stops the currently running server loop.  If a server loop isn't running,
-this is noop.
+this is no-op.
 
 Stopping the server is done via implicit server control channel
 (see `make-server-control-channel` and `terminate-server-loop` in
