@@ -759,39 +759,43 @@
            [tlog (kick-logger-thread pool forwarded?)]
            [ssocks (if path
                      (list (make-server-socket 'unix path))
-                     (make-server-sockets host port :reuse-addr? #t))]
-           [looping #t]
-           [exit-value 0])
+                     (make-server-sockets host port :reuse-addr? #t))])
       (guard (e [(and (<unhandled-signal-error> e)
                       (memv (~ e'signal) `(,SIGINT ,SIGTERM)))
                  (access-log "Shutdown by signal ~a" (~ e'signal))]
                 [else (raise e)])
         (unwind-protect
-            (let1 sel (make <selector>)
-              (dolist [s ssocks]
-                ($ selector-add! sel (socket-fd s)
-                   (^[fd condition]
-                     (accept-client app-data (socket-accept s) pool))
-                   '(r)))
-              (dolist [cch (list control-channel (dev-control-channel))]
-                (when cch
-                  (selector-add! sel (cch 'get-channel)
-                                 (^[fd condition]
-                                   (set! looping #f)
-                                   (set! exit-value (cch 'get-value)))
-                                 '(r))))
-              (when startup-callback (startup-callback ssocks))
-              (access-log "Started on ~a"
-                          (map (.$ sockaddr-name socket-address) ssocks))
-              ;; Main loop
-              (while looping (selector-select sel))
-              exit-value)
+            (server-loop ssocks app-data pool startup-callback control-channel)
           (access-log "Server terminating...")
           (for-each %socket-discard ssocks)
           (tpool:terminate-all! pool :force-timeout 300)
           (thread-terminate! tlog)
           (when path (sys-unlink path)) ; remove unix socket
           (when shutdown-callback (shutdown-callback)))))))
+
+(define (server-loop server-sockets app-data pool
+                     startup-callback control-channel)
+  (define looping #t)
+  (define exit-value 0)
+  (define sel (make <selector>))
+  (dolist [s server-sockets]
+    ($ selector-add! sel (socket-fd s)
+       (^[fd condition]
+         (accept-client app-data (socket-accept s) pool))
+       '(r)))
+  (dolist [cch (list control-channel (dev-control-channel))]
+    (when cch
+      (selector-add! sel (cch 'get-channel)
+                     (^[fd condition]
+                       (set! looping #f)
+                       (set! exit-value (cch 'get-value)))
+                     '(r))))
+  (when startup-callback (startup-callback server-sockets))
+  (access-log "Started on ~a"
+              (map (.$ sockaddr-name socket-address) server-sockets))
+  ;; Main loop
+  (while looping (selector-select sel))
+  exit-value)
 
 (define (kick-logger-thread pool forwarded?)
   (thread-start! (make-thread (cut logger pool forwarded?))))
