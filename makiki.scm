@@ -740,6 +740,7 @@
                                 (port 8080)
                                 (path #f) ; unix domain
                                 ((:document-root docroot) ".")
+                                ((:auto-secure-cookie scookie) #t)
                                 (num-threads 5)
                                 (max-backlog 10)
                                 ((:access-log alog) #f)
@@ -752,7 +753,8 @@
   ;; see initial-log-drain for the possible values of access-log and error-log.
   (parameterize ([access-log-drain (initial-log-drain alog 'access-log)]
                  [error-log-drain (initial-log-drain elog 'error-log)]
-                 [document-root docroot])
+                 [document-root docroot]
+                 [auto-secure-cookie scookie])
     (let* ([pool (tpool:make-thread-pool num-threads :max-backlog max-backlog)]
            [tlog (kick-logger-thread pool forwarded?)]
            [ssocks (if path

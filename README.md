@@ -771,11 +771,14 @@ for the details of Gauche's built-in profiler.
 
 Finally, to start the server, call `start-http-server`.
 
-    (start-http-server :key host port path document-root num-threads max-backlog
-                            access-log error-log forwarded? app-data
+    (start-http-server :key app-data host port path document-root
+                            num-threads max-backlog access-log error-log
+                            forwarded? auto-secure-cookie
                             startup-callback shutdown-callback
                             control-channel)
 
+
+    app-data - an opaque data passed to the request handler as is.
 
     host (#f or string), port (integer) - Passed to make-server-sockets
        of gauche.net to open the server socket.  The default values are
@@ -804,7 +807,9 @@ Finally, to start the server, call `start-http-server`.
        and access-log uses the value of x-forwarded-for header if exists,
        instead of the client's address.
 
-    app-data - an opaque data passed to the request handler as is.
+    auto-secure-cookie - if this is true, 'secure' attribute of cookies
+       are automatically turned on when the request is over a secure
+       channel.  The default is #t.
 
     startup-callback - a procedure to be called after the server opened
        sockets, but before start processing any requests.  A list of
