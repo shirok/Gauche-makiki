@@ -870,8 +870,10 @@ Some less frequently used features are provided in separate modules.
 See [simple proxy example](examples/proxy.scm).
 
 * `makiki.cgi` : Handling CGI scripts.
+See the section [Calling CGI scripts](#calling-cgi-scripts) above.
 
 * `makiki.dev` : Interactive REPL development while running a server.
+See [development.md](doc/development.md) for the details.
 
 ## Examples
 
