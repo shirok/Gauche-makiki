@@ -747,6 +747,12 @@
             (lookup 'tls-load-certificate)
             (lookup 'tls-load-private-key))))
 
+(define (%https-supported?)
+  (boolean (and tls-poll-proc
+                tls-bind-proc
+                tls-load-certificate-proc
+                tls-load-private-key-proc)))
+
 ;; API
 ;; This procedure won't return until the server shuts down.
 (define (start-http-server :key (host #f)
@@ -829,7 +835,7 @@
   exit-value)
 
 (define (make-tls-sockets host port tls-settings)
-  (unless tls-bind-proc
+  (unless (%https-supported?)
     (error "TLS support is not enough in this Gauche.  Use newer version."))
   (let ([certificates (get-keyword :tls-certificates tls-settings '())]
         [private-key  (get-keyword :tls-private-key tls-settings #f)]
