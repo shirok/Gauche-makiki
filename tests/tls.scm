@@ -1,5 +1,6 @@
 (use gauche.parseopt)
 (use file.util)
+(add-load-path ".." :relative)
 (use makiki)
 
 (define *current-dir* (sys-dirname (current-load-path)))

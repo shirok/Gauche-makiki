@@ -1,5 +1,5 @@
-(add-load-path ".." :relative)
 (use gauche.parseopt)
+(add-load-path ".." :relative)
 (use makiki)
 
 ;; SXML templating test

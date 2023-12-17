@@ -16,10 +16,16 @@
 (test-module 'makiki)
 (use makiki.subserver)
 (test-module 'makiki.subserver)
+
+;; TRANSIENT: After Gauche 1.0, we can use (build-path 'cld "tests" path)
+(define (testdir path)
+  (build-path (sys-dirname (current-load-path)) "tests" path))
+
+
 ;;;
 (test-section "basic functionality")
 
-($ call-with-httpd "tests/basic.scm"
+($ call-with-httpd (testdir "basic.scm")
    (^[port]
      (define s #"localhost:~port")
      (test* "basic responds 404" "404"
@@ -44,7 +50,7 @@
 ;;;
 (test-section "request methods")
 
-($ call-with-httpd "tests/methods.scm"
+($ call-with-httpd (testdir "methods.scm")
    (^[port]
      (define s #"localhost:~port")
      (test* "GET"    "get"    (values-ref (http-get s "/") 2))
@@ -64,7 +70,7 @@
 
 ;;;
 (test-section "component match")
-($ call-with-httpd "tests/path-components.scm"
+($ call-with-httpd (testdir "path-components.scm")
    (^[port]
      (define s #"localhost:~port")
      (define (g path expect)
@@ -104,20 +110,20 @@
 ;;;
 (test-section "file-handler")
 
-($ call-with-httpd "tests/file.scm"
+($ call-with-httpd (testdir "file.scm")
    (^[port]
      (define s #"localhost:~port")
      (define (file-test path ctype)
        (receive (code hdrs body) (http-get s #"/~path")
          (test* (format "file test ~s" path) `("200" ,ctype #t)
                 (list code (rfc822-header-ref hdrs "content-type")
-                      (equal? (file->string path) body)))))
-     (file-test "tests/file.scm" "text/plain")
-     (file-test "tests/file-dummy.js" "application/javascript; charset=utf-8")
-     (file-test "tests/file-dummy.gif" "image/gif")
-     (file-test "tests/file-dummy.jpg" "image/jpeg")
-     (file-test "tests/file-dummy.png" "image/png")
-     (file-test "tests/file-dummy.css" "text/css")
+                      (equal? (file->string (testdir path)) body)))))
+     (file-test "file.scm" "text/plain")
+     (file-test "file-dummy.js" "application/javascript; charset=utf-8")
+     (file-test "file-dummy.gif" "image/gif")
+     (file-test "file-dummy.jpg" "image/jpeg")
+     (file-test "file-dummy.png" "image/png")
+     (file-test "file-dummy.css" "text/css")
      ))
 
 ;;;
@@ -145,13 +151,13 @@
               (cut lset= equal? <> <>))
        )))
 
-(test-cgi-stuff "tests/test-env1.scm")
-(test-cgi-stuff "tests/test-env2.scm")
+(test-cgi-stuff (testdir "test-env1.scm"))
+(test-cgi-stuff (testdir "test-env2.scm"))
 
 ;;;
 (test-section "customized respond/ng body")
 
-($ call-with-httpd "tests/customized-ng.scm"
+($ call-with-httpd (testdir "customized-ng.scm")
    (^[port]
      (define s #"localhost:~port")
      (test* "custom 404 response body"
@@ -160,7 +166,7 @@
             (receive (code hdrs body) (http-get s "/")
               (list code (rfc822-header-ref hdrs "content-type") body)))))
 
-($ call-with-httpd "tests/customized-ng.scm"
+($ call-with-httpd (testdir "customized-ng.scm")
    (^[port]
      (define s #"localhost:~port")
      (test* "error in custom 404 response body"
@@ -169,7 +175,7 @@
             (receive (code hdrs body) (http-get s "/favicon.ico")
               (list code (rfc822-header-ref hdrs "content-type") body)))))
 
-($ call-with-httpd "tests/customized-ng.scm"
+($ call-with-httpd (testdir "customized-ng.scm")
    (^[port]
      (define s #"localhost:~port")
      (test* "request-error condition"
@@ -181,7 +187,7 @@
 ;;;
 (test-section "sxml template")
 
-($ call-with-httpd "tests/sxml-tmpl.scm"
+($ call-with-httpd (testdir "sxml-tmpl.scm")
    (^[port]
      (define s #"localhost:~port")
      (test* "sxml-tmpl"
@@ -191,7 +197,7 @@
 ;;;
 (test-section "json")
 
-($ call-with-httpd "tests/json-server.scm"
+($ call-with-httpd (testdir "json-server.scm")
    (^[port]
      (define s #"localhost:~port")
      (test* "json request/response" "{\"count\":0}"
@@ -209,7 +215,7 @@
 ;;;
 (test-section "set-cookie")
 
-($ call-with-httpd "tests/cookie.scm"
+($ call-with-httpd (testdir "cookie.scm")
    (^[port]
      (define s #"localhost:~port")
      (define (t query expects . opts)
@@ -233,7 +239,7 @@
 
 (use rfc.cookie)
 
-($ call-with-httpd "tests/let-params.scm"
+($ call-with-httpd (testdir "let-params.scm")
    (^[port]
      (define s #"localhost:~port")
      (define (req path . args)
@@ -252,7 +258,7 @@
 ;;;
 (test-section "server error handler")
 
-($ call-with-httpd "tests/server-error.scm"
+($ call-with-httpd (testdir "server-error.scm")
    (^[port]
      (define s #"localhost:~port")
      (test* "server error handler" '("500" "Internal Server Error")
@@ -289,11 +295,11 @@
 (test-section "server termination")
 
 (test* "/a" 1
-       ($ call-with-httpd/wait "tests/termination.scm"
+       ($ call-with-httpd/wait (testdir "termination.scm")
           (^[port] (http-get #"localhost:~port" "/a"))))
 
 (test* "/b" 2
-       ($ call-with-httpd/wait "tests/termination.scm"
+       ($ call-with-httpd/wait (testdir "termination.scm")
           (^[port] (http-get #"localhost:~port" "/b"))))
 
 ;;;
@@ -306,14 +312,14 @@
       (test* "profile output" #t
              (begin
                (sys-unlink *profiler.out*)
-               ($ call-with-httpd "tests/profiler.scm"
+               ($ call-with-httpd (testdir "profiler.scm")
                   (^[port] (http-get #"localhost:~port" "/profile")))
                (and (file-exists? *profiler.out*)
                     (> (file-size *profiler.out*) 0))))
       (test* "profile output" #f
              (begin
                (sys-unlink *profiler.out*)
-               ($ call-with-httpd "tests/profiler.scm"
+               ($ call-with-httpd (testdir "profiler.scm")
                   (^[port] (http-get #"localhost:~port" "/noprofile")))
                (and (file-exists? *profiler.out*)
                     (> (file-size *profiler.out*) 0)))))
@@ -334,7 +340,7 @@
 ;;;
 (test-section "sessions")
 
-($ call-with-httpd "tests/session.scm"
+($ call-with-httpd (testdir "session.scm")
    (^[port]
      (define s #"localhost:~port")
      (define session-key #f)

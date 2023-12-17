@@ -1,7 +1,8 @@
 (use gauche.parseopt)
 (use gauche.uvector)
-(use makiki)
 (use rfc.json)
+(add-load-path ".." :relative)
+(use makiki)
 
 (define (main args)
   (let-args (cdr args) ([p "port=i"])

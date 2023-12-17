@@ -1,4 +1,5 @@
 (use gauche.parseopt)
+(add-load-path ".." :relative)
 (use makiki)
 (use makiki.session)
 

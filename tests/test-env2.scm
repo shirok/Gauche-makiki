@@ -1,4 +1,6 @@
 (use gauche.parseopt)
+(use file.util)
+(add-load-path ".." :relative)
 (use makiki)
 (use makiki.cgi)
 
@@ -9,5 +11,7 @@
                        :port p))
   0)
 
+(define dir (sys-dirname (current-load-path)))
+
 (define-http-handler "/"
-  (cgi-script "tests/env.scm"))
+  (cgi-script (build-path dir "env.scm")))

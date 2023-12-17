@@ -1,4 +1,5 @@
 (use gauche.parseopt)
+(add-load-path ".." :relative)
 (use makiki)
 
 (define *ch* (make-server-control-channel))

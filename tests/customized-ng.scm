@@ -1,6 +1,7 @@
 ;; Returning customized body with non-200 response
 
 (use gauche.parseopt)
+(add-load-path ".." :relative)
 (use makiki)
 
 (define (main args)
