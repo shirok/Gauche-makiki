@@ -731,13 +731,27 @@
   (control-channel 'request-termination exit-value))
 
 ;;;
-;;; Main loop
+;;; Server loop
 ;;;
+
+;; TRANSIENT: tls-poll is only available after 0.9.13.  We only enable
+;; tls server if it is avilable.  After Gauche 1.0 release, remove this
+;; hack altogether and just use tls-poll.
+(define-values (tls-poll-proc
+                tls-bind-proc
+                tls-load-certificate-proc
+                tls-load-private-key-proc)
+  (let ([lookup (^[name] (global-variable-ref 'rfc.tls name #f))])
+    (values (lookup 'tls-poll)
+            (lookup 'tls-bind)
+            (lookup 'tls-load-certificate)
+            (lookup 'tls-load-private-key))))
 
 ;; API
 ;; This procedure won't return until the server shuts down.
 (define (start-http-server :key (host #f)
-                                (port 8080)
+                                (port #f)
+                                (tls-port #f)
                                 (path #f) ; unix domain
                                 ((:document-root docroot) ".")
                                 ((:auto-secure-cookie scookie) #t)
@@ -745,6 +759,7 @@
                                 (max-backlog 10)
                                 ((:access-log alog) #f)
                                 ((:error-log elog) #f)
+                                (tls-settings '())
                                 (forwarded? #f)
                                 (app-data #f)
                                 (control-channel #f)
@@ -757,9 +772,15 @@
                  [auto-secure-cookie scookie])
     (let* ([pool (tpool:make-thread-pool num-threads :max-backlog max-backlog)]
            [tlog (kick-logger-thread pool forwarded?)]
-           [ssocks (if path
-                     (list (make-server-socket 'unix path))
-                     (make-server-sockets host port :reuse-addr? #t))])
+           ;; If none of port, tls-port and path is given, use port 8080
+           ;; for the convenience.
+           [default-port (or port (and (not tls-port) (not path) 8080))]
+           [ssocks (cond-list
+                    [path (list (make-server-socket 'unix path))]
+                    [default-port
+                     @ (make-server-sockets host default-port :reuse-addr? #t)]
+                    [tls-port
+                     (make-tls-sockets host tls-port tls-settings)])])
       (guard (e [(and (<unhandled-signal-error> e)
                       (memv (~ e'signal) `(,SIGINT ,SIGTERM)))
                  (access-log "Shutdown by signal ~a" (~ e'signal))]
@@ -773,29 +794,60 @@
           (when path (sys-unlink path)) ; remove unix socket
           (when shutdown-callback (shutdown-callback)))))))
 
+;; Main loop.  We can't use <selector> for TLS socket (it doesn't expose
+;; underlying fd), so we use a kludge---we run a thread for each TLS sock
+;; to poll, and use a pipe to tell the incoming request to the main loop.
 (define (server-loop server-sockets app-data pool
                      startup-callback control-channel)
-  (define looping #t)
+  (define looping (box #t))
   (define exit-value 0)
   (define sel (make <selector>))
   (dolist [s server-sockets]
-    ($ selector-add! sel (socket-fd s)
-       (^[fd condition]
-         (accept-client app-data (socket-accept s) pool))
-       '(r)))
+    (when (is-a? s <socket>)
+      ($ selector-add! sel (socket-fd s)
+         (^[fd condition]
+           (accept-client app-data (socket-accept s) pool))
+         '(r))))
   (dolist [cch (list control-channel (dev-control-channel))]
     (when cch
       (selector-add! sel (cch 'get-channel)
                      (^[fd condition]
-                       (set! looping #f)
+                       (set-box! looping #f)
                        (set! exit-value (cch 'get-value)))
                      '(r))))
   (when startup-callback (startup-callback server-sockets))
   (access-log "Started on ~a"
-              (map (.$ sockaddr-name socket-address) server-sockets))
+              (map (.$ sockaddr-name connection-self-address) server-sockets))
   ;; Main loop
-  (while looping (selector-select sel))
+  (while (unbox looping) (selector-select sel))
   exit-value)
+
+(define (make-tls-sockets host port tls-settings)
+  (unless tls-bind-proc
+    (error "TLS support is not enough in this Gauche.  Use newer version."))
+  (let ([certificates (get-keyword :tls-certificates tls-settings '())]
+        [private-key  (get-keyword :tls-private-key tls-settings #f)]
+        [password     (get-keyword :tls-private-key-password tls-settings #f)]
+        [tls (make-tls)])
+    (for-each (cut tls-load-certificate-proc tls <>) certificates)
+    (when private-key
+      (tls-load-private-key-proc tls private-key password))
+    (tls-bind-proc tls host port)
+    tls))
+
+;; Returns an input fd to monitor
+(define (kick-tls-poll-thread tls looping)
+  (define-values (in out) (sys-pipe))
+  ;; for graceful shutdown, we periodically check if stop is requested
+  (define (poll-thunk)
+    (let loop ()
+      (if (null? (tls-poll-proc tls '(read) 3.0))
+        ;; timeout
+        (when (unbox looping)
+          (loop))
+        (begin (write-byte 0 out) (loop)))))
+  (thread-start! (make-thread poll-thunk))
+  in)
 
 (define (kick-logger-thread pool forwarded?)
   (thread-start! (make-thread (cut logger pool forwarded?))))
