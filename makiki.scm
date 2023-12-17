@@ -803,11 +803,17 @@
   (define exit-value 0)
   (define sel (make <selector>))
   (dolist [s server-sockets]
-    (when (is-a? s <socket>)
+    (if (is-a? s <socket>)
       ($ selector-add! sel (socket-fd s)
          (^[fd condition]
            (accept-client app-data (socket-accept s) pool))
-         '(r))))
+         '(r))
+      (let1 p (kick-tls-poll-thread s looping)
+        ($ selector-add! sel (port-file-number p)
+           (^[fd condition]
+             (read-byte p) ; discard dummy byte
+             (accept-client app-data (tls-accept s) pool))
+           '(r)))))
   (dolist [cch (list control-channel (dev-control-channel))]
     (when cch
       (selector-add! sel (cch 'get-channel)
