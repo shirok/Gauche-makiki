@@ -18,3 +18,6 @@
                        :tls-port p
                        :tls-settings *tls-settings*))
   0)
+
+(define-http-handler "/"
+  (^[req app] (respond/ok req "https ok")))

@@ -8,6 +8,7 @@
 (use gauche.test)
 (use rfc.822)
 (use rfc.http)
+(use rfc.tls)
 (use scheme.list)
 (use srfi.98)
 
@@ -372,6 +373,22 @@
      (test* "guard with session (logout)" "Huh?"
             (values-ref (http-get s "/anything") 2))
      ))
+
+;;;
+;; TRANSIENT: This check won't be needed after newer Gauche release.
+;; NB: This requires HEAD Gauche as of Dec 17, 2023.  To run this test from
+;; the Gauche source tree (under src/):
+;; make GOSH="./gosh -ftest" srcdir=$(MAKIKIDIR) -f $(MAKIKIDIR)/Makefile check
+(when ((with-module makiki %https-supported?))
+  (test-section "https")
+  ($ call-with-httpd (testdir "tls.scm")
+     (^[port]
+       (parameterize ((tls-ca-bundle-path (testdir "data/test-cert.pem")))
+         (test* "TLS connection" "https ok"
+                (values-ref (http-get #"localhost:~|port|" "/" :secure #t)
+                            2)))))
+
+  )
 
 ;; epilogue
 (test-end :exit-on-failure #t)
