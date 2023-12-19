@@ -780,58 +780,47 @@ Finally, to start the server, call `start-http-server`.
                             control-channel)
 
 
-    app-data - an opaque data passed to the request handler as is.
+It takes the following keyword arguments:
 
-    host (#f or string), port (#f or integer) - Passed to make-server-sockets
-       of gauche.net to open the server socket.  If none of PORT,
-       TLS-PORT and PATH arguments are given, Port 8080 is used for
-       the convenience.
-
-    tls-port (#f or integer) - Opens and listens TLS connection on
-       this port.  See [Running https server](doc/https.md) for how
-       to run https server.
-
-    path (#f or string) - If a string is given, it specifies the path to
-       a Unix-domain socket on which the server listens.
-
-    document-root - used to specify the root of the document served
-       by file-handler.  The default is the process's working directory.
-
-    num-threads - number of threads to serve the request.  Currently threads
-       are created when the server is started.  The default is 5.
-
-    max-backlog - max number of request queued when all threads are busy.
-       When a request comes while the queue is full, 503 (server busy)
-       response is returned to the client.   The default is 10.
-
-    access-log, error-log - specify the destination of logs.  #f (no log),
-       #t (stdout), string (filename) or <log-drain> object.
-       For access log, <log-drain> is better not to have prefix, for
-       timestamp is included in the message.  The default is #f.
-
-    tls-settings (keyword-value list): Pathnames for certificates and
-       private keys.  See [Running https server](doc/https.md) for details.
-
-    forwarded? - specify true if you use makiki behind a reverse-proxy httpd,
-       and access-log uses the value of x-forwarded-for header if exists,
-       instead of the client's address.
-
-    auto-secure-cookie - if this is true, 'secure' attribute of cookies
-       are automatically turned on when the request is over a secure
-       channel.  The default is #t.
-
-    startup-callback - a procedure to be called after the server opened
-       sockets, but before start processing any requests.  A list of
-       server sockets are passed as the only argument.  Logging procedures
-       are already active.
-
-    shutdown-callback - a thunk to be called after all the server operations
-       are shut down.  If given, this is the last thing `start-http-server`
-       does before returning.
-
-    control-channel - an opaque object, through which you can request
-       the server loop to shutdown.  See `make-server-control-channel` and
-       `terminate-server-loop` below.
+- `app-data` - an opaque data passed to the request handler as is.
+- `host` (`#f` or string), `port` (`#f` or integer) - Passed to
+`make-server-sockets` of `gauche.net` to open the server socket.
+If none of `port`, `tls-port` and `path` arguments are given, port 8080
+is used for the convenience.
+- `tls-port` (`#f` or integer) - Opens and listens TLS connection on
+this port.  See [Running https server](doc/https.md) for how
+to run https server.
+- `path` (`#f` or string) - If a string is given, it specifies the path to
+a Unix-domain socket on which the server listens.
+- `document-root` - used to specify the root of the document served
+by `file-handler`.  The default is the process's working directory.
+- `num-threads` - number of threads to serve the request.  Currently threads
+are created when the server is started.  The default is 5.
+- `max-backlog` - max number of request queued when all threads are busy.
+When a request comes while the queue is full, 503 (server busy)
+response is returned to the client.   The default is 10.
+- `access-log`, `error-log` - specify the destination of logs.  `#f` (no log),
+`#t` (stdout), string (filename) or `<log-drain>` object.
+For access log, `<log-drain>` is better not to have prefix, for
+timestamp is included in the message.  The default is `#f`.
+- `tls-settings` (keyword-value list): Pathnames for certificates and
+private keys.  See [Running https server](doc/https.md) for details.
+- `forwarded?` - specify true if you use makiki behind a reverse-proxy httpd,
+and access-log uses the value of `x-forwarded-for` header if exists,
+instead of the client's address.
+- `auto-secure-cookie` - if this is true, 'secure' attribute of cookies
+are automatically turned on when the request is over a secure
+channel.  The default is `#t`.
+- `startup-callback` - a procedure to be called after the server opened
+sockets, but before start processing any requests.  A list of
+server sockets are passed as the only argument.  Logging procedures
+are already active.
+- `shutdown-callback` - a thunk to be called after all the server operations
+are shut down.  If given, this is the last thing `start-http-server`
+does before returning.
+- `control-channel` - an opaque object, through which you can request
+the server loop to shutdown.  See `make-server-control-channel` and
+`terminate-server-loop` below.
 
 Note that `start-http-server` enters the server loop and won't return
 by default.  There are two ways to shut down the server loop.
