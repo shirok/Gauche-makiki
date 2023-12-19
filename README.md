@@ -771,8 +771,10 @@ for the details of Gauche's built-in profiler.
 
 Finally, to start the server, call `start-http-server`.
 
-    (start-http-server :key app-data host port path document-root
-                            num-threads max-backlog access-log error-log
+    (start-http-server :key app-data host port tls-port path
+                            document-root num-threads max-backlog
+                            access-log error-log
+                            tls-settings
                             forwarded? auto-secure-cookie
                             startup-callback shutdown-callback
                             control-channel)
@@ -780,13 +782,17 @@ Finally, to start the server, call `start-http-server`.
 
     app-data - an opaque data passed to the request handler as is.
 
-    host (#f or string), port (integer) - Passed to make-server-sockets
-       of gauche.net to open the server socket.  The default values are
-       #f and 8080.
+    host (#f or string), port (#f or integer) - Passed to make-server-sockets
+       of gauche.net to open the server socket.  If none of PORT,
+       TLS-PORT and PATH arguments are given, Port 8080 is used for
+       the convenience.
+
+    tls-port (#f or integer) - Opens and listens TLS connection on
+       this port.  See [Running https server](doc/https.md) for how
+       to run https server.
 
     path (#f or string) - If a string is given, it specifies the path to
-       a Unix-domain socket on which the server listens.  In that case
-       `host` and `port` arguments are ignored.
+       a Unix-domain socket on which the server listens.
 
     document-root - used to specify the root of the document served
        by file-handler.  The default is the process's working directory.
@@ -802,6 +808,9 @@ Finally, to start the server, call `start-http-server`.
        #t (stdout), string (filename) or <log-drain> object.
        For access log, <log-drain> is better not to have prefix, for
        timestamp is included in the message.  The default is #f.
+
+    tls-settings (keyword-value list): Pathnames for certificates and
+       private keys.  See [Running https server](doc/https.md) for details.
 
     forwarded? - specify true if you use makiki behind a reverse-proxy httpd,
        and access-log uses the value of x-forwarded-for header if exists,
