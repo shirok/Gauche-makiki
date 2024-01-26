@@ -45,6 +45,7 @@
   (use gauche.sequence)
   (use gauche.threads)
   (use gauche.uvector)
+  (use gauche.version)
   (use gauche.vport)
   (use rfc.822)
   (use rfc.cookie)
@@ -734,25 +735,6 @@
 ;;; Server loop
 ;;;
 
-;; TRANSIENT: tls-poll is only available after 0.9.13.  We only enable
-;; tls server if it is avilable.  After Gauche 1.0 release, remove this
-;; hack altogether and just use tls-poll.
-(define-values (tls-poll-proc
-                tls-bind-proc
-                tls-load-certificate-proc
-                tls-load-private-key-proc)
-  (let ([lookup (^[name] (global-variable-ref 'rfc.tls name #f))])
-    (values (lookup 'tls-poll)
-            (lookup 'tls-bind)
-            (lookup 'tls-load-certificate)
-            (lookup 'tls-load-private-key))))
-
-(define (%https-supported?)
-  (boolean (and tls-poll-proc
-                tls-bind-proc
-                tls-load-certificate-proc
-                tls-load-private-key-proc)))
-
 ;; API
 ;; This procedure won't return until the server shuts down.
 (define (start-http-server :key (host #f)
@@ -828,23 +810,23 @@
                        (set! exit-value (cch 'get-value)))
                      '(r))))
   (when startup-callback (startup-callback server-sockets))
-  (access-log "Started on ~a"
-              (map (.$ sockaddr-name connection-self-address) server-sockets))
+  ($ access-log "Started on ~a"
+     (map (.$ connection-address-name connection-self-address) server-sockets))
   ;; Main loop
   (while (unbox looping) (selector-select sel))
   exit-value)
 
 (define (make-tls-sockets host port tls-settings)
-  (unless (%https-supported?)
+  (unless (version>=? (gauche-version) "0.9.14")
     (error "TLS support is not enough in this Gauche.  Use newer version."))
   (let ([certificates (get-keyword :tls-certificates tls-settings '())]
         [private-key  (get-keyword :tls-private-key tls-settings #f)]
         [password     (get-keyword :tls-private-key-password tls-settings #f)]
         [tls (make-tls)])
-    (for-each (cut tls-load-certificate-proc tls <>) certificates)
+    (for-each (cut tls-load-certificate tls <>) certificates)
     (when private-key
-      (tls-load-private-key-proc tls private-key password))
-    (tls-bind-proc tls host port)
+      (tls-load-private-key tls private-key password))
+    (tls-bind tls host port)
     tls))
 
 ;; Returns an input fd to monitor
@@ -853,7 +835,7 @@
   ;; for graceful shutdown, we periodically check if stop is requested
   (define (poll-thunk)
     (let loop ()
-      (if (null? (tls-poll-proc tls '(read) 3.0))
+      (if (null? (tls-poll tls '(read) 3.0))
         ;; timeout
         (when (unbox looping)
           (loop))

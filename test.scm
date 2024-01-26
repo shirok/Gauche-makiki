@@ -6,6 +6,7 @@
 (use gauche.net)
 (use gauche.process)
 (use gauche.test)
+(use gauche.version)
 (use rfc.822)
 (use rfc.http)
 (use rfc.tls)
@@ -14,7 +15,12 @@
 
 (test-start "makiki")
 (use makiki)
-(test-module 'makiki)
+(test-module 'makiki
+             ;; these symbols are only available in Gauche 0.9.14 or later
+             :allow-undefined '(tls-poll
+                                tls-bind
+                                tls-load-private-key
+                                tls-load-certificate))
 (use makiki.subserver)
 (test-module 'makiki.subserver)
 
@@ -375,11 +381,7 @@
      ))
 
 ;;;
-;; TRANSIENT: This check won't be needed after newer Gauche release.
-;; NB: This requires HEAD Gauche as of Dec 17, 2023.  To run this test from
-;; the Gauche source tree (under src/):
-;; make GOSH="./gosh -ftest" srcdir=$(MAKIKIDIR) -f $(MAKIKIDIR)/Makefile check
-(when ((with-module makiki %https-supported?))
+(when (version>=? (gauche-version) "0.9.14")
   (test-section "https")
   ($ call-with-httpd (testdir "tls.scm")
      (^[port]
