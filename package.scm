@@ -1,5 +1,5 @@
 (define-gauche-package "Gauche-makiki"
-  :version "0.4"
+  :version "0.5"
   :description "Simple multithreaded http server"
   :require (("Gauche" (>= "0.9.7")))
   :providing-modules (makiki makiki.cgi makiki.connect makiki.dev)

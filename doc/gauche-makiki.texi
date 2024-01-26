@@ -13,7 +13,7 @@
 @c JP
 @documentlanguage ja
 @setfilename gauche-makiki.ja.info
-@settitle Makiki - Gaucheによる簡単なHTTPサーバ
+@settitle Makiki - GaucheによるシンプルなHTTPサーバ
 @dircategory The Algorithmic Language Scheme
 @direntry
 * Gauche Makiki: (gauche-makiki.ja.info).	Gaucheによる簡単なHTTPサーバ
@@ -127,6 +127,9 @@ to install Gauche-makiki in a different location, give it with
 
 @node Getting started, API reference, Introduction, Top
 @chapter Getting started
+
+
+
 
 
 @node API reference, Index, Getting started, Top

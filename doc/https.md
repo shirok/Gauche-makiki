@@ -1,9 +1,6 @@
 # Running https server
 
-To serve over secure connections, you need Gauche newer than 0.9.13,
-for the release version lacks necessary features.
-Install Gauche HEAD from the [repository](https://github.com/shirok/Gauche).
-See its [HACKING.adoc](https://github.com/shirok/Gauche/blob/master/HACKING.adoc) for installation instructions.
+To serve over secure connections, you need Gauche release 0.9.14 or later.
 
 You also need your server certificate, intermediate certificates, and
 a private key.  Just to test in the local environment, you can generate
