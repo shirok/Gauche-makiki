@@ -39,10 +39,10 @@ gauche-makiki.ja.info.gz : gauche-makiki.ja.texi
 	fi
 
 gauche-makiki.en.texi : gauche-makiki.texi
-	$(GOSH) tools/preprocess-info -en -o gauche-makiki.en.texi gauche-makiki.texi
+	$(GOSH) tools/docprep -en -o gauche-makiki.en.texi gauche-makiki.texi
 
 gauche-makiki.ja.texi : gauche-makiki.texi
-	$(GOSH) tools/preprocess-info -jp -o gauche-makiki.ja.texi gauche-makiki.texi
+	$(GOSH) tools/docprep -jp -o gauche-makiki.ja.texi gauche-makiki.texi
 
 clean:
 	rm -rf core *~ *.aux *.cp *.fn *.fns *.ky *.log \
