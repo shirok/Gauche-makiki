@@ -36,6 +36,8 @@ so you can either install it as an ordinary Gauche extension library,
 or you can just copy the file into your application.
 
 You need Gauche 0.9.7 or later to use Gauche-makiki.
+To serve over secure connection (https), you need Gauche 0.9.14 or later
+with TLS support.
 
 
 ## Getting started

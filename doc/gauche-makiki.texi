@@ -77,31 +77,15 @@ webserver (e.g. Apache) serve the static content.
 
 @subheading Prerequisites
 
-You need Gauche 0.9.12 or later:
+You need Gauche 0.9.14 or later:
 @url{https://practical-scheme.net/Gauche}.
 
-Make sure Gauche is compled with thread support.  Once you
-install Gauche, you can check its configuration with @code{gosh -V}.
-
-@example
-$ gosh -V
-Gauche scheme shell, version 0.9.12 [utf-8,pthreads], x86_64-pc-linux-gnu
-(version "0.9.12")
-(command "gosh")
-(scheme.id gauche)
-(languages scheme r5rs r7rs)
-(encodings utf-8)
-(website "https://practical-scheme.net/gauche")
-(build.platform "x86_64-pc-linux-gnu")
-(build.configure "--prefix=/usr" "--enable-multibyte=utf-8")
-(scheme.path "/usr/share/gauche-0.98/site/lib" "/usr/share/gauche-0.98/0.9.12/lib")
-(gauche.threads pthreads)
-(gauche.net.tls mbedtls)
-@end example
-
-
-You should have either @code{(gauche.threads pthreads)} or
-@code{(gauche.threads wthreads)}.
+In order to serve https, Gauche needs to be configured with TLS support.
+You can check it with @code{gosh -V}, and look for @code{gauche.net.tls}
+line.  If it lists a subsystem (e.g. @code{(gauche.net.tls mbedtls)}),
+TLS is supported.
+If it is empty (e.g. @code{(gauche.net.tls)}, TLS support is not
+available.
 
 @subheading Installation
 
