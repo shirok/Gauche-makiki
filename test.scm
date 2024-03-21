@@ -169,7 +169,7 @@
      (define s #"localhost:~port")
      (test* "custom 404 response body"
             '("404" "text/html; charset=utf-8"
-              "<html><title>404 Not found</title><body><p>I don't have that!</p></body></html>")
+              "<!DOCTYPE html>\n<html><title>404 Not found</title><body><p>I don't have that!</p></body></html>")
             (receive (code hdrs body) (http-get s "/")
               (list code (rfc822-header-ref hdrs "content-type") body)))))
 
@@ -198,7 +198,7 @@
    (^[port]
      (define s #"localhost:~port")
      (test* "sxml-tmpl"
-            "<html><body><p>Yo, Keoki.  Howzit?</p></body></html>"
+            "<!DOCTYPE html>\n<html><body><p>Yo, Keoki.  Howzit?</p></body></html>"
             (values-ref (http-get s "/?g=2&name=Keoki") 2))))
 
 ;;;
