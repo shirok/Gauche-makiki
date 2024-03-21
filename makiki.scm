@@ -456,11 +456,13 @@
       [('sxml node . substs)
        (let1 n (if (null? substs) node (%sxml-subst node substs))
          (match n
-           [('html . _) (v "text/html; charset=utf-8"
-                           (tree->string `("<!DOCTYPE html>\n"
-                                           ,(sxml:sxml->html n))))]
-           [_           (v "application/xml"
-                           (tree->string (sxml:sxml->xml n)))]))]
+           [('html . _)
+            (v "text/html; charset=utf-8"
+               (tree->string `("<!DOCTYPE html>\n" ,(sxml:sxml->html n))))]
+           [_
+            (v "application/xml"
+               (tree->string `("<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+                               ,(sxml:sxml->xml n))))]))]
       [('chunks . chunks)
        ;; NB: Once we support chunked output, we don't need to calculate
        ;; the total length.
