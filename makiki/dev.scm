@@ -51,25 +51,38 @@
 ;; A module where the script is loaded.
 ;; We use named module, so that the user can switch into this module in REPL.
 (define-module makiki.user)
-(define *server-module* (find-module 'makiki.user))
+(define *default-server-module* (find-module 'makiki.user))
+(define *server-module* #f)
 
 ;; a hidden parameter to stop the server loop
 (define dev-cch (with-module makiki dev-control-channel))
 
 ;; API
-(define (start-server! :optional (path *server-file*))
+;;  Load a server script given in PATH, and call its 'dev-main' or 'main'
+;;  procedure.  The server script is loaded into 'makiki.user module.
+;;  If the server script defines its own module and 'main' inside it,
+;;  you need to give MOD argument to specify the module where 'main' resides.
+(define (start-server! :optional (path *server-file*) (mod *server-module*))
   (unless path
-    (error "Server file path rquired for the first call."))
+    (error "Server file path required for the first call."))
   ;; Kludge - clear the existing handlers.  This isn't a public API.
   ((with-module makiki clear-handlers!))
   (set! *server-file*
         (%load (sys-normalize-pathname path :absolute #t :expand #t)
-               :environment *server-module*))
+               :environment *default-server-module*))
+  (set! *server-module*
+        (cond [(not mod) (or *server-module* *default-server-module*)]
+              [(symbol? mod)
+               (or (find-module mod)
+                   (errorf "Module ~a isn't defined, even after loading \
+                            the server script ~s." mod path))]
+              [(module? mod) mod]
+              [else (error "Invalid mod argument:" mod)]))
   (unless (%thread-alive? *server-thread*)
     (dev-cch (make-server-control-channel))
     (set! *server-thread*
           (thread-start!
-           (make-thread (cut %run-server! *server-module* path)))))
+           (make-thread (cut %run-server! mod path)))))
   (%ensure-watcher!)
   *server-thread*)
 
