@@ -14,7 +14,7 @@ improve the program without stopping the server.
 
 ## API
 
-### `(start-server! [SCRIPT-PATH])`
+### `(start-server! [SCRIPT-PATH [MODULE]])`
 
 Load the server script specified by `SCRIPT-PATH` and runs the
 server in a separate thread.
@@ -25,6 +25,11 @@ the file's mtime changes, it automatically reloads it.
 
 The script is loaded into a module `makiki.user`, to avoid interfering
 with whatever you're doing in the default `user` module.
+
+If the script creates its own module and defines `main` (or `dev-main`;
+see below) in it, you need to tell the name of the module with `MODULE`
+argument.  It is remembered as well, so you can omit it in the
+subsequent calls.
 
 Running the server is a bit tricky; typically, Makiki server script
 creates and initializes an application object and then calls
