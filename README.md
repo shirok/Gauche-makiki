@@ -598,7 +598,7 @@ on the server.
 
     (file-handler :key (directory-index '("index.html" #t))
                        (path-trans request-path)
-                       (root (document-root)))
+                       (root #f))
 
 `PATH-TRANS` should be a procedure that takes `REQUEST` and returns
 the server-side file path.  The returned path should start from
@@ -606,8 +606,10 @@ slash, and the document-root directory passed to the start-http-server
 is prepended to it.  It is not allowed to go above the document
 root directory by `"/../../.."` etc---403 error message would results.
 
-If you need to access files other than document-root, you can specify
-alternative root directory by the `ROOT` keyword argument.
+The file to be served is determined as this: First, the path part
+is extracted from the request with `PATH-TRANS`, then the directory
+name given to `ROOT` argument is appended.  If `ROOT` is `#f`, the
+value of the parameter `document-root` is used.
 
 The `DIRECTORY-INDEX` keyword argument specifies the behavior when
 given path is a directory.  It must be a list of either filename or
