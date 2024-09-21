@@ -25,14 +25,14 @@ html : gauche-makiki.en.html gauche-makiki.en.html
 info : gauche-makiki.en.info.gz gauche-makiki.ja.info.gz
 
 gauche-makiki.en.info.gz : gauche-makiki.en.texi
-	if test -n "$(MAKEINFO)" -a -n "$(GZIP_PROGRAM)"; then \
+	if test -n $(MAKEINFO) -a -n $(GZIP_PROGRAM); then \
 	  $(MAKEINFO) --no-warn gauche-makiki.en.texi; \
 	  rm -rf gauche-makiki.en.info*.gz; \
 	  $(GZIP_PROGRAM) gauche-makiki.en.info ; \
 	fi
 
 gauche-makiki.ja.info.gz : gauche-makiki.ja.texi
-	if test -n "$(MAKEINFO)" -a -n "$(GZIP_PROGRAM)"; then \
+	if test -n $(MAKEINFO) -a -n $(GZIP_PROGRAM); then \
 	  $(MAKEINFO) --no-warn gauche-makiki.ja.texi; \
 	  rm -rf gauche-makiki.ja.info*.gz; \
 	  $(GZIP_PROGRAM) gauche-makiki.ja.info ; \

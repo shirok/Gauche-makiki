@@ -6,7 +6,7 @@
 
 (cf-init-gauche-extension)
 
-(cf-check-prog 'MAKEINFO '("makeinfo"))
+(cf-check-prog 'MAKEINFO '("makeinfo") :default "")
 (cf-check-prog 'GZIP_PROGRAM '("gzip"))
 
 (cf-output-default)
