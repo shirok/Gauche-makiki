@@ -68,8 +68,8 @@
   ;; Kludge - clear the existing handlers.  This isn't a public API.
   ((with-module makiki clear-handlers!))
   (set! *server-file*
-        (%load (sys-normalize-pathname path :absolute #t :expand #t)
-               :environment *default-server-module*))
+        (load (sys-normalize-pathname path :absolute #t :expand #t)
+              :environment *default-server-module*))
   (set! *server-module*
         (cond [(not mod) (or *server-module* *default-server-module*)]
               [(symbol? mod)
@@ -159,12 +159,3 @@
   (cond [(global-variable-ref mod 'dev-shutdown #f)
          => (^[dev-shutdown] (dev-shutdown))]
         [else #f]))
-
-;; TRANSIENT:
-;; From Gauche 0.9.13, 'load' returns the actual file name that's loaded.
-;; To run Makiki with Gauche 0.9.12 or before, we emulate that load.
-(define (%load path :key environment)
-  (match ((with-module gauche.internal find-load-file)
-          path *load-path* *load-suffixes*
-          :error-if-not-found #t :allow-archive #f)
-    [(found _) (and (load found :environment environment) found)]))

@@ -1,7 +1,7 @@
 (define-gauche-package "Gauche-makiki"
-  :version "0.5"
+  :version "0.5.1"
   :description "Simple multithreaded http server"
-  :require (("Gauche" (>= "0.9.7")))
+  :require (("Gauche" (>= "0.9.13")))
   :providing-modules (makiki makiki.cgi makiki.connect makiki.dev)
   :maintainers ("shiro@acm.org")
   :authors ("Shiro Kawai <shiro@acm.org>")
