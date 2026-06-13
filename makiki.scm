@@ -1079,7 +1079,9 @@
     [#/\.png$/ () "image/png"]
     [#/\.(jpg|jpeg)$/ () "image/jpeg"]
     [#/\.gif$/ () "image/gif"]
+    [#/\.svg$/ () "image/svg+xml"]
     [#/\.css$/ () "text/css"]
+    (#/\.pdf$/ () "application/pdf")
     [#/\.(mpg|mpeg)$/ () "video/mpeg"]
     [#/\.(mp4)$/ () "video/mp4"]
     [#/\.(wm[xv]?)$/ (_ m) #"video/x-ms-~m"]
